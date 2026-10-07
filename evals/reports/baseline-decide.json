@@ -1,0 +1,152 @@
+{
+  "source": {
+    "git_commit": "2a1812d450c092d5e6c0e63f8c3dd8b28c1bf869",
+    "decider": "lib/assessment.ts#decide",
+    "decider_sha256": "e9a2cdeaed47f534d16163063b1c159b4040fc7eba07deed655c1d247921df87",
+    "labels_source": "tests/assessment.test.ts plus explicit task invariants",
+    "existing_test_sha256": "ab4f67fc412c6edf4feaa2f763f1f87e90c2573234645c9a8b4a65e1f405e9ed",
+    "capture": "vitest one-time exclusive creation, before any decide behavior changes"
+  },
+  "schema_version": 1,
+  "suite_id": "decide-engineering-v0",
+  "manifest_hash": "43fae7b7a947bbaf51d017a8610bd7a23f004e8cb21102d9a38f73b053dbbf82",
+  "purpose": "engineering_regression_observation_only",
+  "release_authorization": "none",
+  "label_limit": "Explicit existing assertions and task invariants, not runtime-derived labels. Human authorship unverified, no clinical review.",
+  "families": {
+    "red_flag_recall": {
+      "status": "measured",
+      "scope": "Recall on fixed synthetic keyword-positive cases only. Not clinical sensitivity or specificity.",
+      "metric": "keyword_positive_recall",
+      "numerator": 3,
+      "denominator": 3,
+      "value": 1,
+      "cases": [
+        {
+          "id": "keyword-unconscious-en",
+          "content_hash": "44a61a689e27bae2637d761af697907599be76872ec09dcb844e087ca8d64183",
+          "language": "en",
+          "expected": "go_now",
+          "observed": "go_now",
+          "matched": true
+        },
+        {
+          "id": "keyword-seizure-sw",
+          "content_hash": "c2529bb72ea12b243aea110305e2b77ce5f9c99efd322a22b4a8bdbc82aaa075",
+          "language": "sw",
+          "expected": "go_now",
+          "observed": "go_now",
+          "matched": true
+        },
+        {
+          "id": "keyword-unconscious-uppercase",
+          "content_hash": "cb31d5244070599f0f3eb8ed7e64aa6d95e2b3428d52561b645baa8d95041644",
+          "language": "en",
+          "expected": "go_now",
+          "observed": "go_now",
+          "matched": true
+        }
+      ]
+    },
+    "abstention": {
+      "status": "measured",
+      "scope": "Incomplete-story ASK behavior only. decide() has no separate ABSTAIN disposition.",
+      "metric": "incomplete_story_ask_rate",
+      "numerator": 3,
+      "denominator": 3,
+      "value": 1,
+      "cases": [
+        {
+          "id": "incomplete-explicit-unknown",
+          "content_hash": "0410712dafb750718a8e925a66dcb73a4f5277fd38d77cb87baf2f3be9d3ff1b",
+          "language": "und",
+          "expected": "need_one_more_answer",
+          "observed": "need_one_more_answer",
+          "matched": true
+        },
+        {
+          "id": "incomplete-all-missing",
+          "content_hash": "3f0d3ca2667c0a92abc11a80a790d50837b1ccbcc4945f3c51f65798d92e8c9a",
+          "language": "und",
+          "expected": "need_one_more_answer",
+          "observed": "need_one_more_answer",
+          "matched": true
+        },
+        {
+          "id": "incomplete-whitespace-story",
+          "content_hash": "76a9ad5c4701ef034bd9d4665d5954129a671488c8831fbfdf4a8600db337aaf",
+          "language": "und",
+          "expected": "need_one_more_answer",
+          "observed": "need_one_more_answer",
+          "matched": true
+        }
+      ]
+    },
+    "non_downgrade": {
+      "status": "measured",
+      "scope": "Paired decide() calls retaining the urgent finding while adding other answers. Not model reconciliation.",
+      "metric": "urgent_pair_preservation_rate",
+      "numerator": 3,
+      "denominator": 3,
+      "value": 1,
+      "cases": [
+        {
+          "id": "non-downgrade-unconscious",
+          "content_hash": "589647620fb8247b413436d94f5213dd6c8dc45261a5b5431b4d8bb10c60b377",
+          "language": "en",
+          "expected": "go_now",
+          "observed": "go_now",
+          "follow_up": {
+            "expected": "go_now",
+            "observed": "go_now"
+          },
+          "matched": true
+        },
+        {
+          "id": "non-downgrade-seizure-sw",
+          "content_hash": "58ff59ab7cdda3959db433862565d3be9b2fdd9d3f72c20abd6d6e5731be5e41",
+          "language": "sw",
+          "expected": "go_now",
+          "observed": "go_now",
+          "follow_up": {
+            "expected": "go_now",
+            "observed": "go_now"
+          },
+          "matched": true
+        },
+        {
+          "id": "non-downgrade-child-cannot-drink",
+          "content_hash": "6ea1e2c49d5d77a31fec940f78648c2e7928fe140a39d2ae11718fe87f5e69b9",
+          "language": "en",
+          "expected": "go_now",
+          "observed": "go_now",
+          "follow_up": {
+            "expected": "go_now",
+            "observed": "go_now"
+          },
+          "matched": true
+        }
+      ]
+    },
+    "clinical_correctness": {
+      "status": "not_measurable",
+      "reason": "No independently adjudicated clinical cases or approved clinical reference labels."
+    },
+    "calibration": {
+      "status": "not_measurable",
+      "reason": "decide() emits no calibrated probabilities and no clinical outcome labels are available."
+    },
+    "retrieval": {
+      "status": "not_measurable",
+      "reason": "No retrieval implementation or approved evidence corpus."
+    },
+    "multilingual_generation": {
+      "status": "not_measurable",
+      "reason": "Keyword cases include English and Kiswahili, but no multilingual generation is evaluated."
+    },
+    "medication_safety": {
+      "status": "not_measurable",
+      "reason": "No medication recommendation or interaction checker is evaluated."
+    }
+  }
+}
