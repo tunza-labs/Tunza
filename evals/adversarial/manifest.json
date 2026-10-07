@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "suite_id": "adversarial-engineering-v0",
+  "purpose": "engineering_fixtures_only",
+  "hash_encoding": "sha256_sorted_keys_compact_json_utf8",
+  "scope_note": "Adversarial engineering fixtures. Expected labels are task invariants, not decide() output. Human authorship unverified. Not a training set.",
+  "label_authorship_decision": {
+    "choice": "Accept the test-sourced labels for engineering-only regression with human authorship explicitly unverified.",
+    "human_authorship": "unverified",
+    "clinical_review": "not_reviewed",
+    "use": "engineering_regression_ruler_only",
+    "not_a_clinical_label_set": true
+  },
+  "cases": [
+    {
+      "id": "paraphrase-passed-out-en",
+      "path": "adversarial/cases.json",
+      "content_hash": "5a4e6d9d818aff50fae15596986b6c951b34af483e31e9b57c13b33cd8ce4b3c",
+      "lineage": "SYNTHETIC",
+      "provenance": {
+        "input_origin": "Agent-created paraphrase of the synthetic unconscious fixture. No patient record.",
+        "label_source": "Task 2.c paraphrase-bypass invariant, fixed before execution",
+        "label_derivation": "explicit_assertion_not_runtime_output",
+        "human_authorship": "unverified",
+        "clinical_review": "not_reviewed"
+      }
+    },
+    {
+      "id": "sw-misspelling-degedege",
+      "path": "adversarial/cases.json",
+      "content_hash": "845128d61f4a7eae6a0c9243c30c43804ff8db84844269d78ef30e8df13aaceb",
+      "lineage": "SYNTHETIC",
+      "provenance": {
+        "input_origin": "Agent-created misspelling of a synthetic Kiswahili seizure fixture. No patient record.",
+        "label_source": "tests/assessment.test.ts seizure assertion plus task 2.c misspelling invariant, fixed before execution",
+        "label_derivation": "explicit_assertion_not_runtime_output",
+        "human_authorship": "unverified",
+        "clinical_review": "not_reviewed"
+      }
+    },
+    {
+      "id": "sw-colloquial-haamuki",
+      "path": "adversarial/cases.json",
+      "content_hash": "012840085c4ff64e3f98e14312959ee7ff3b3e3363096c8d7e72bb354e491da3",
+      "lineage": "SYNTHETIC",
+      "provenance": {
+        "input_origin": "Agent-created near-form of a synthetic Kiswahili not-waking fixture. No patient record.",
+        "label_source": "Task 2.c colloquial/misspelling invariant, fixed before execution",
+        "label_derivation": "explicit_assertion_not_runtime_output",
+        "human_authorship": "unverified",
+        "clinical_review": "not_reviewed"
+      }
+    },
+    {
+      "id": "sw-codeswitch-unconscious",
+      "path": "adversarial/cases.json",
+      "content_hash": "29474d94c55611553e462775cbdc85669d6ea8eaeb2227f32c61101c744a42f8",
+      "lineage": "SYNTHETIC",
+      "provenance": {
+        "input_origin": "Agent-created code-switched synthetic sentence. No patient record.",
+        "label_source": "tests/assessment.test.ts unconscious assertion plus task 2.c code-switching invariant, fixed before execution",
+        "label_derivation": "explicit_assertion_not_runtime_output",
+        "human_authorship": "unverified",
+        "clinical_review": "not_reviewed"
+      }
+    },
+    {
+      "id": "injection-inert-unconscious",
+      "path": "adversarial/cases.json",
+      "content_hash": "54c0d5cb4b317ad6d51586a2e5f36abf4a98aeb6aeef6f68be57aa3b99990118",
+      "lineage": "SYNTHETIC",
+      "provenance": {
+        "input_origin": "Agent-created inert instruction-override marker beside a synthetic unconscious sentence. No patient record.",
+        "label_source": "tests/assessment.test.ts unconscious assertion; marker is data, not a label source",
+        "label_derivation": "explicit_assertion_not_runtime_output",
+        "human_authorship": "unverified",
+        "clinical_review": "not_reviewed"
+      }
+    }
+  ]
+}

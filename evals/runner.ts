@@ -31,13 +31,36 @@ export type ManifestEntry = {
     clinical_review: "not_reviewed";
   };
 };
+export const LABEL_AUTHORSHIP_CHOICE =
+  "Accept the test-sourced labels for engineering-only regression with human authorship explicitly unverified.";
+
+export type LabelAuthorshipDecision = {
+  choice: typeof LABEL_AUTHORSHIP_CHOICE;
+  human_authorship: "unverified";
+  clinical_review: "not_reviewed";
+  use: "engineering_regression_ruler_only";
+  not_a_clinical_label_set: true;
+};
+
 export type Manifest = {
   schema_version: 1;
   suite_id: string;
   purpose: "engineering_fixtures_only";
   hash_encoding: "sha256_sorted_keys_compact_json_utf8";
+  label_authorship_decision: LabelAuthorshipDecision;
   cases: ManifestEntry[];
 };
+
+// Host amendment: the authorship decision is required governance metadata.
+// It is excluded from the frozen measurement hash so the baseline identity
+// does not move when the caveat is recorded.
+export function measurementManifest(
+  manifest: Manifest,
+): Omit<Manifest, "label_authorship_decision"> {
+  const copy: Manifest = { ...manifest, cases: manifest.cases };
+  delete (copy as Partial<Manifest>).label_authorship_decision;
+  return copy;
+}
 export type Suite = { manifest: Manifest; cases: EvalCase[] };
 export type Decider = (answers: AssessmentAnswers) => { kind: DecisionKind };
 
@@ -116,6 +139,14 @@ export function loadSuite(evalsRoot: string, manifestName = "manifest.json"): Su
       manifest.hash_encoding !== "sha256_sorted_keys_compact_json_utf8" ||
       !Array.isArray(manifest.cases) || manifest.cases.length === 0) {
     throw new Error("Invalid or empty eval manifest");
+  }
+  const decision = manifest.label_authorship_decision;
+  if (!decision || decision.choice !== LABEL_AUTHORSHIP_CHOICE ||
+      decision.human_authorship !== "unverified" ||
+      decision.clinical_review !== "not_reviewed" ||
+      decision.use !== "engineering_regression_ruler_only" ||
+      decision.not_a_clinical_label_set !== true) {
+    throw new Error("Missing unverified-authorship decision");
   }
   const seen = new Set<string>();
   const cases = manifest.cases.map((entry) => {
@@ -219,7 +250,7 @@ export function evaluateSuite(suite: Suite, decider: Decider) {
   return {
     schema_version: 1,
     suite_id: suite.manifest.suite_id,
-    manifest_hash: contentHash(suite.manifest),
+    manifest_hash: contentHash(measurementManifest(suite.manifest)),
     purpose: "engineering_regression_observation_only",
     release_authorization: "none",
     label_limit: "Explicit existing assertions and task invariants, not runtime-derived labels. Human authorship unverified, no clinical review.",

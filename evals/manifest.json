@@ -3,6 +3,13 @@
   "suite_id": "decide-engineering-v0",
   "purpose": "engineering_fixtures_only",
   "hash_encoding": "sha256_sorted_keys_compact_json_utf8",
+  "label_authorship_decision": {
+    "choice": "Accept the test-sourced labels for engineering-only regression with human authorship explicitly unverified.",
+    "human_authorship": "unverified",
+    "clinical_review": "not_reviewed",
+    "use": "engineering_regression_ruler_only",
+    "not_a_clinical_label_set": true
+  },
   "cases": [
     {
       "id": "keyword-unconscious-en",
