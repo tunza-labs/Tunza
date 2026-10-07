@@ -1,0 +1,6 @@
+# Keep LF on every machine. Windows checkouts with autocrlf otherwise rewrite
+# lib/assessment.ts and break the frozen decider hash in evals/reports.
+* text=auto eol=lf
+
+*.png binary
+*.pdf binary
