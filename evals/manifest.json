@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "suite_id": "decide-engineering-v0",
+  "purpose": "engineering_fixtures_only",
+  "hash_encoding": "sha256_sorted_keys_compact_json_utf8",
+  "label_authorship_decision": {
+    "choice": "Accept the test-sourced labels for engineering-only regression with human authorship explicitly unverified.",
+    "human_authorship": "unverified",
+    "clinical_review": "not_reviewed",
+    "use": "engineering_regression_ruler_only",
+    "not_a_clinical_label_set": true
+  },
+  "cases": [
+    {
+      "id": "keyword-unconscious-en",
+      "path": "cases/engineering.json",
+      "content_hash": "44a61a689e27bae2637d761af697907599be76872ec09dcb844e087ca8d64183",
+      "lineage": "SYNTHETIC",
+      "provenance": {
+        "input_origin": "Synthetic repository test example copied verbatim; no patient record.",
+        "label_source": "tests/assessment.test.ts:15-22 at 2a42af2, explicit go_now assertion",
+        "label_derivation": "explicit_assertion_not_runtime_output",
+        "human_authorship": "unverified",
+        "clinical_review": "not_reviewed"
+      }
+    },
+    {
+      "id": "keyword-seizure-sw",
+      "path": "cases/engineering.json",
+      "content_hash": "c2529bb72ea12b243aea110305e2b77ce5f9c99efd322a22b4a8bdbc82aaa075",
+      "lineage": "SYNTHETIC",
+      "provenance": {
+        "input_origin": "Synthetic repository test example copied verbatim; no patient record.",
+        "label_source": "tests/assessment.test.ts:24-33 at 2a42af2, explicit go_now assertion",
+        "label_derivation": "explicit_assertion_not_runtime_output",
+        "human_authorship": "unverified",
+        "clinical_review": "not_reviewed"
+      }
+    },
+    {
+      "id": "keyword-unconscious-uppercase",
+      "path": "cases/engineering.json",
+      "content_hash": "cb31d5244070599f0f3eb8ed7e64aa6d95e2b3428d52561b645baa8d95041644",
+      "lineage": "SYNTHETIC",
+      "provenance": {
+        "input_origin": "Agent-created uppercase-only variant of keyword-unconscious-en.",
+        "label_source": "tests/assessment.test.ts:15-22 at 2a42af2; original explicit label retained under a case-only transformation",
+        "label_derivation": "explicit_assertion_not_runtime_output",
+        "human_authorship": "unverified",
+        "clinical_review": "not_reviewed"
+      }
+    },
+    {
+      "id": "incomplete-explicit-unknown",
+      "path": "cases/engineering.json",
+      "content_hash": "0410712dafb750718a8e925a66dcb73a4f5277fd38d77cb87baf2f3be9d3ff1b",
+      "lineage": "SYNTHETIC",
+      "provenance": {
+        "input_origin": "Synthetic repository test example copied verbatim; no patient record.",
+        "label_source": "tests/assessment.test.ts:78-89 at 2a42af2, explicit need_one_more_answer assertion",
+        "label_derivation": "explicit_assertion_not_runtime_output",
+        "human_authorship": "unverified",
+        "clinical_review": "not_reviewed"
+      }
+    },
+    {
+      "id": "incomplete-all-missing",
+      "path": "cases/engineering.json",
+      "content_hash": "3f0d3ca2667c0a92abc11a80a790d50837b1ccbcc4945f3c51f65798d92e8c9a",
+      "lineage": "SYNTHETIC",
+      "provenance": {
+        "input_origin": "Agent-created missing-input variant of incomplete-explicit-unknown.",
+        "label_source": "Task 1.b incomplete-story abstention requirement and vault/wave1-contract.md section 2 ASK definition; fixed before execution",
+        "label_derivation": "explicit_assertion_not_runtime_output",
+        "human_authorship": "unverified",
+        "clinical_review": "not_reviewed"
+      }
+    },
+    {
+      "id": "incomplete-whitespace-story",
+      "path": "cases/engineering.json",
+      "content_hash": "76a9ad5c4701ef034bd9d4665d5954129a671488c8831fbfdf4a8600db337aaf",
+      "lineage": "SYNTHETIC",
+      "provenance": {
+        "input_origin": "Agent-created whitespace-only variant of incomplete-explicit-unknown.",
+        "label_source": "tests/assessment.test.ts:78-89 at 2a42af2; original explicit label retained for an empty story",
+        "label_derivation": "explicit_assertion_not_runtime_output",
+        "human_authorship": "unverified",
+        "clinical_review": "not_reviewed"
+      }
+    },
+    {
+      "id": "non-downgrade-unconscious",
+      "path": "cases/engineering.json",
+      "content_hash": "589647620fb8247b413436d94f5213dd6c8dc45261a5b5431b4d8bb10c60b377",
+      "lineage": "SYNTHETIC",
+      "provenance": {
+        "input_origin": "Agent-created pair retaining the original urgent finding while adding other answers.",
+        "label_source": "tests/assessment.test.ts:15-22 at 2a42af2 plus task 1.b non-downgrade invariant; both expected labels fixed before execution",
+        "label_derivation": "explicit_assertion_not_runtime_output",
+        "human_authorship": "unverified",
+        "clinical_review": "not_reviewed"
+      }
+    },
+    {
+      "id": "non-downgrade-seizure-sw",
+      "path": "cases/engineering.json",
+      "content_hash": "58ff59ab7cdda3959db433862565d3be9b2fdd9d3f72c20abd6d6e5731be5e41",
+      "lineage": "SYNTHETIC",
+      "provenance": {
+        "input_origin": "Agent-created pair retaining the original urgent finding while adding other answers.",
+        "label_source": "tests/assessment.test.ts:24-33 at 2a42af2 plus task 1.b non-downgrade invariant; both expected labels fixed before execution",
+        "label_derivation": "explicit_assertion_not_runtime_output",
+        "human_authorship": "unverified",
+        "clinical_review": "not_reviewed"
+      }
+    },
+    {
+      "id": "non-downgrade-child-cannot-drink",
+      "path": "cases/engineering.json",
+      "content_hash": "6ea1e2c49d5d77a31fec940f78648c2e7928fe140a39d2ae11718fe87f5e69b9",
+      "lineage": "SYNTHETIC",
+      "provenance": {
+        "input_origin": "Agent-created pair retaining child-not-drinking while adding duration and main problem.",
+        "label_source": "tests/assessment.test.ts:35-46 at 2a42af2 plus task 1.b non-downgrade invariant; both expected labels fixed before execution",
+        "label_derivation": "explicit_assertion_not_runtime_output",
+        "human_authorship": "unverified",
+        "clinical_review": "not_reviewed"
+      }
+    }
+  ]
+}

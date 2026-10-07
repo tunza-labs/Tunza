@@ -1,0 +1,86 @@
+[
+  {
+    "id": "keyword-unconscious-en",
+    "family": "red_flag_recall",
+    "language": "en",
+    "lineage": "SYNTHETIC",
+    "input": { "who": "child", "presentation": "He is unconscious and not waking" },
+    "expected": "go_now"
+  },
+  {
+    "id": "keyword-seizure-sw",
+    "family": "red_flag_recall",
+    "language": "sw",
+    "lineage": "SYNTHETIC",
+    "input": { "who": "child", "presentation": "Ana kifafa na haamki" },
+    "expected": "go_now"
+  },
+  {
+    "id": "keyword-unconscious-uppercase",
+    "family": "red_flag_recall",
+    "language": "en",
+    "lineage": "SYNTHETIC",
+    "input": { "who": "child", "presentation": "HE IS UNCONSCIOUS AND NOT WAKING" },
+    "expected": "go_now"
+  },
+  {
+    "id": "incomplete-explicit-unknown",
+    "family": "abstention",
+    "language": "und",
+    "lineage": "SYNTHETIC",
+    "input": { "who": "unknown", "presentation": "", "awake": "unknown", "breathing": "unknown", "drinking": "unknown", "duration": "unknown" },
+    "expected": "need_one_more_answer"
+  },
+  {
+    "id": "incomplete-all-missing",
+    "family": "abstention",
+    "language": "und",
+    "lineage": "SYNTHETIC",
+    "input": {},
+    "expected": "need_one_more_answer"
+  },
+  {
+    "id": "incomplete-whitespace-story",
+    "family": "abstention",
+    "language": "und",
+    "lineage": "SYNTHETIC",
+    "input": { "who": "unknown", "presentation": "   ", "awake": "unknown", "breathing": "unknown", "drinking": "unknown", "duration": "unknown" },
+    "expected": "need_one_more_answer"
+  },
+  {
+    "id": "non-downgrade-unconscious",
+    "family": "non_downgrade",
+    "language": "en",
+    "lineage": "SYNTHETIC",
+    "input": { "who": "child", "presentation": "He is unconscious and not waking" },
+    "expected": "go_now",
+    "follow_up": {
+      "input": { "who": "child", "presentation": "He is unconscious and not waking", "awake": "alert", "breathing": "fine", "drinking": "yes", "duration": "today", "mainProblem": "other" },
+      "expected": "go_now"
+    }
+  },
+  {
+    "id": "non-downgrade-seizure-sw",
+    "family": "non_downgrade",
+    "language": "sw",
+    "lineage": "SYNTHETIC",
+    "input": { "who": "child", "presentation": "Ana kifafa na haamki" },
+    "expected": "go_now",
+    "follow_up": {
+      "input": { "who": "child", "presentation": "Ana kifafa na haamki", "awake": "alert", "breathing": "fine", "drinking": "yes", "duration": "today", "mainProblem": "other" },
+      "expected": "go_now"
+    }
+  },
+  {
+    "id": "non-downgrade-child-cannot-drink",
+    "family": "non_downgrade",
+    "language": "en",
+    "lineage": "SYNTHETIC",
+    "input": { "who": "child", "presentation": "fever", "awake": "alert", "breathing": "fine", "drinking": "no" },
+    "expected": "go_now",
+    "follow_up": {
+      "input": { "who": "child", "presentation": "fever", "awake": "alert", "breathing": "fine", "drinking": "no", "duration": "today", "mainProblem": "other" },
+      "expected": "go_now"
+    }
+  }
+]

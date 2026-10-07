@@ -355,6 +355,17 @@ const en = {
   languageButton: "Kiswahili",
   languageAria: "Badilisha lugha kuwa Kiswahili",
   disclaimer: "Not a substitute for emergency services or professional medical care.",
+
+  contractObservedFacts: "Observed facts",
+  contractRetrievedEvidence: "Retrieved evidence",
+  contractDerivedFeatures: "Derived features",
+  contractHypotheses: "Hypotheses",
+  contractUncertainties: "Uncertainties",
+  contractContradictions: "Contradictions",
+  contractRequiredInformation: "Required information",
+  contractRedFlags: "Recorded flags",
+  contractNextAction: "Next action",
+  contractProvenance: "Provenance",
 };
 
 export type CopyKey = keyof typeof en;
@@ -686,6 +697,17 @@ const sw: Record<CopyKey, string> = {
   languageButton: "English",
   languageAria: "Switch language to English",
   disclaimer: "Si mbadala wa huduma za dharura au matibabu ya kitaalamu.",
+
+  contractObservedFacts: "Mambo yaliyotajwa",
+  contractRetrievedEvidence: "Ushahidi ulioletwa",
+  contractDerivedFeatures: "Vipengele vilivyokokotwa",
+  contractHypotheses: "Mawazo",
+  contractUncertainties: "Yasiyojulikana",
+  contractContradictions: "Kinachokinzana",
+  contractRequiredInformation: "Taarifa zinazohitajika",
+  contractRedFlags: "Alama zilizorekodiwa",
+  contractNextAction: "Hatua inayofuata",
+  contractProvenance: "Chanzo",
 };
 
 const TABLES: Record<Locale, Record<CopyKey, string>> = { en, sw };
