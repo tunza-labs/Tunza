@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plan: Tunza architecture as developed</title>
+<style>
+  :root {
+    --action: #7c1f18;
+    --brand-deep: #4a1210;
+    --urgent: #b3261e;
+    --today: #8a4b12;
+    --watch: #1d4a73;
+    --warn: #7a4e0b;
+    --ink: #1c1916;
+    --ink-soft: #5c564c;
+    --ground: #e8e0d2;
+    --paper: #f4efe6;
+    --raised: #fffcf7;
+    --line: #e2d8c8;
+    --font: Inter, Roboto, "Segoe UI", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--ground); }
+  body {
+    margin: 0;
+    color: var(--ink);
+    background: var(--paper);
+    font-family: var(--font);
+    font-size: 16px;
+    line-height: 1.5;
+  }
+  main {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 48px 28px 96px;
+  }
+  header h1 {
+    margin: 0 0 8px;
+    font-size: 28px;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    font-weight: 700;
+  }
+  h2 {
+    margin: 0 0 12px;
+    font-size: 20px;
+    line-height: 1.3;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+  }
+  h3 { margin: 28px 0 8px; font-size: 16px; font-weight: 650; }
+  h4 { margin: 22px 0 8px; font-size: 15px; font-weight: 650; }
+  p { margin: 0 0 12px; }
+  a { color: var(--action); }
+  code, .mono { font-family: var(--mono); font-size: 13px; }
+  code {
+    background: var(--raised);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 0 4px;
+  }
+  pre {
+    background: var(--brand-deep);
+    color: var(--paper);
+    border-radius: 16px;
+    padding: 16px 18px;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.45;
+  }
+  pre code { background: transparent; border: 0; color: inherit; padding: 0; }
+  section { margin-top: 40px; }
+  .rule { height: 3px; width: 72px; background: var(--action); border-radius: 2px; margin: 0 0 20px; }
+  details.meta, details {
+    background: var(--raised);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 12px 16px;
+    margin: 12px 0;
+  }
+  details summary { cursor: pointer; font-weight: 650; }
+  dl { display: grid; grid-template-columns: 140px 1fr; gap: 6px 12px; margin: 12px 0 0; }
+  dt { color: var(--ink-soft); font-size: 13px; }
+  dd { margin: 0; font-size: 13px; font-family: var(--mono); }
+  figure { margin: 20px 0 8px; }
+  figure img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 16px;
+    border: 1px solid var(--line);
+    background: var(--raised);
+  }
+  figcaption { margin-top: 8px; color: var(--ink-soft); font-size: 13px; }
+  ul { margin: 8px 0 12px; padding-left: 20px; }
+  li { margin: 6px 0; }
+  .tag {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    border-radius: 999px;
+    padding: 2px 8px;
+    margin-right: 6px;
+    border: 1px solid var(--line);
+  }
+  .tag.existing { color: var(--watch); background: #e3eef7; border-color: transparent; }
+  .tag.new { color: var(--action); background: #f6e4df; border-color: transparent; }
+  .tag.closed { color: var(--warn); background: #f7edd6; border-color: transparent; }
+  .phase {
+    background: var(--raised);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 20px 20px 8px;
+    margin: 16px 0 24px;
+  }
+  .status { color: var(--action); font-weight: 650; }
+  .checklist { list-style: none; padding-left: 0; }
+  .loop {
+    margin: 16px 0;
+    padding: 12px 14px;
+    border-left: 3px solid var(--action);
+    background: #f6e4df;
+    border-radius: 0 12px 12px 0;
+    font-size: 14px;
+  }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 14px; }
+  th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  th { font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); font-weight: 650; }
+  .callout {
+    background: var(--raised);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 14px 16px;
+    margin: 12px 0;
+  }
+  .callout strong { color: var(--action); }
+  .stack { display: grid; gap: 8px; margin: 16px 0; }
+  .layer {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 10px 14px;
+    background: var(--raised);
+  }
+  .layer b { display: block; font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--action); }
+  .muted { color: var(--ink-soft); }
+  @page { size: letter; margin: 0.65in 0.7in; }
+  @media print {
+    html, body { background: var(--paper); }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    main { max-width: none; padding: 0; }
+    figure, pre, table, .callout, .loop, details { break-inside: avoid; }
+    h2, h3, h4 { break-after: avoid; }
+    .phase { break-inside: auto; }
+    a { color: var(--ink); text-decoration: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+
+  <header>
+    <div class="rule"></div>
+    <h1>Plan: Tunza architecture as developed</h1>
+    <p>One public Next.js app. A demo floor that cannot be downgraded. A ten-section contract that is not yet on the screen.</p>
+    <details class="meta">
+      <summary>Metadata</summary>
+      <dl>
+        <dt>created</dt>      <dd>2026-10-07T02:17:05Z</dd>
+        <dt>modified</dt>     <dd>2026-10-07T02:17:05Z, 2026-10-07T02:24:14Z, 2026-10-07T03:10:37Z</dd>
+        <dt>commits</dt>      <dd>none</dd>
+        <dt>agent name</dt>        <dd>Hermes</dd>
+        <dt>session id</dt>      <dd>20261006_210923_498ac0</dd>
+        <dt>back refs</dt>    <dd>Tunza/vault/architecture.md, Tunza/vault/capability-map.md, Tunza/vault/wave1-contract.md, Tunza/vault/wave1-handoff.md, Tunza/vault/wave2-ledger.md, Tunza/vault/decisions.md, Tunza/vault/product.md, second-brain/wiki/tunza.md, commit 2a42af2, commit 2a1812d, commit 8228512</dd>
+        <dt>forward refs</dt> <dd>none</dd>
+      </dl>
+    </details>
+  </header>
+
+  <figure>
+    <img src="tunza-architecture-as-developed/hero.png" alt="Household, CHP, and Facility above one floor and a contract">
+    <figcaption>Three surfaces. One floor. The contract sits under the verdict, not instead of it.</figcaption>
+  </figure>
+
+  <section id="purpose">
+    <h2>Purpose</h2>
+    <p>Record the Tunza architecture that actually exists on 2026-10-07, and specify the one bounded slice that finishes it: put the clinical contract on the existing care path without opening training, retrieval, the private prompt lane, or a release.</p>
+    <p>This is an engineering plan. It is not a clinical approval, not a device claim, and not a model release. The demo rules in <code>lib/assessment.ts</code> stay labeled not clinically validated.</p>
+  </section>
+
+  <section id="problem">
+    <h2>Problem</h2>
+    <p>The pitch and the second-brain page still talk as if Tunza were either unbuilt or already a trained healthcare model. The code is neither. The public repo is a working three-surface demo. The private repo is a hosted prompt in front of Anthropic, with no floor under it. Wave 1 built the missing contract in the public tree, then stopped before the screen used it.</p>
+    <ul>
+      <li>There are no owned weights, no adapter, and no training set in either tree. The phrase "existing Tunza clone model" means the private prompt lane, not a clone. Source: <code>vault/capability-map.md</code> section 0.</li>
+      <li>The public decision is <code>decide()</code> at <code>lib/assessment.ts:91</code>. The store still calls it directly at <code>lib/store.tsx:198</code>. <code>runClinicalPipeline</code> is not imported by any component.</li>
+      <li>The README "What exists today" list includes vitals, case history, outbreak signals, verified clinicians, notifications, web push, and a PWA. Those are not in the public code. Code is truth. Source: <code>vault/capability-map.md</code> section 17.</li>
+      <li>Host recovery wrote the rest of wave 1 into the working tree and did not commit or push. Head of the last child commit is <code>8228512</code>. Source: <code>vault/wave1-handoff.md</code>.</li>
+      <li>The second-brain page <code>wiki/tunza.md</code> still says the product is pre-build and that the architecture names are absent from <code>~/code/Tunza</code>. That page is stale relative to this tree. Do not treat it as the current architecture.</li>
+    </ul>
+    <figure>
+      <img src="tunza-architecture-as-developed/problem.png" alt="Public and private lanes with no weights between them">
+      <figcaption>Two products. No weights. The unsafe junction is the private lane with nothing under the model.</figcaption>
+    </figure>
+  </section>
+
+  <section id="solution">
+    <h2>Solution</h2>
+    <p>Keep the public app as the trunk. The demo floor remains the only approved path. A candidate that is lower, unrecognized, or merely higher-but-unapproved is rewritten to the floor and recorded as a disagreement. The ten sections stay separate. The household still sees one verdict. Nothing in this slice trains, retrieves, encodes a guideline threshold, edits <code>medical-triage</code>, or authorizes a release.</p>
+    <div class="stack">
+      <div class="layer"><b>Surfaces</b> Household, CHP, and facility. Same referral object. Copy from <code>lib/copy.ts</code> only. <code>describeReferral</code> is the only place referral state becomes words.</div>
+      <div class="layer"><b>Product spine</b> Reducer in <code>lib/store.tsx</code>. Verdict is still a <code>Decision</code> from <code>decide()</code>. Persistence stays <code>localStorage</code> key <code>tunza.v2.care</code>. Do not store the contract there.</div>
+      <div class="layer"><b>Floor</b> <code>decide()</code>. Four kinds: go now, get care today, monitor at home, need one more answer. English and Kiswahili danger keywords. Abstain by asking, not by inventing certainty.</div>
+      <div class="layer"><b>Contract</b> <code>lib/clinical/contract.ts</code>. Ten sections. Disposition table adds <code>escalate</code> and <code>abstain</code> internally. No new user-visible headline. <code>abstain</code> has a null headline key.</div>
+      <div class="layer"><b>State and reconcile</b> Encounter-scoped append-only events. Same-type conflicts stay unresolved. Trends are structural, not clinical cutoffs. Reconciler fail-closed: <code>fail_open</code> is the literal <code>false</code>.</div>
+      <div class="layer"><b>Eval</b> Family-keyed reports. Retrieval, calibration, clinical correctness, multilingual generation, and medication safety stay <code>not_measurable</code>. No <code>score</code> field gates a release. Promotion stays blocked.</div>
+    </div>
+    <figure>
+      <img src="tunza-architecture-as-developed/solution.png" alt="The floor wins and ten sections stay separate">
+      <figcaption>The floor wins. Ten sections stay ten sections.</figcaption>
+    </figure>
+  </section>
+
+  <section id="files" class="files">
+    <h2>Relevant Files</h2>
+
+    <h3>Existing Files</h3>
+    <ul>
+      <li><span class="tag existing">existing</span> <code>lib/assessment.ts</code> — demo floor. Do not edit the rules or <code>decide()</code>.</li>
+      <li><span class="tag existing">existing</span> <code>lib/types.ts</code> — <code>Role</code>, <code>DecisionKind</code>, <code>ReferralStage</code>, <code>Encounter</code>. Read-only this slice.</li>
+      <li><span class="tag existing">existing</span> <code>lib/copy.ts</code> — EN/SW table. Contract section labels already exist at the English keys around line 359 and the Kiswahili keys around line 701. A missing Kiswahili string is a compile error.</li>
+      <li><span class="tag existing">existing</span> <code>lib/referral.ts</code> — canonical lifecycle and the single presentation function.</li>
+      <li><span class="tag existing">existing</span> <code>lib/store.tsx</code> — reducer. Line 198 sets <code>decision</code> from <code>decide(answers)</code> when the question flow stops.</li>
+      <li><span class="tag existing">existing</span> <code>lib/clinical/contract.ts</code> — runtime-validated ten-section assessment. Committed in <code>2a1812d</code>. Do not rewrite it.</li>
+      <li><span class="tag existing">existing</span> <code>lib/clinical/state.ts</code> — append-only encounter projection. Working tree, uncommitted.</li>
+      <li><span class="tag existing">existing</span> <code>lib/clinical/reconcile.ts</code> — floor wins. Working tree, uncommitted.</li>
+      <li><span class="tag existing">existing</span> <code>lib/clinical/pipeline.ts</code> — <code>decide()</code> then reconciler then contract. Not called by the UI.</li>
+      <li><span class="tag existing">existing</span> <code>evals/runner.ts</code> — frozen baseline runner. Expected labels are not derived from <code>decide()</code>.</li>
+      <li><span class="tag existing">existing</span> <code>evals/gates.ts</code> — fail-closed promotion. <code>promotion</code> is the literal <code>"blocked"</code>.</li>
+      <li><span class="tag existing">existing</span> <code>components/DecisionResult.tsx</code> — verdict, one action, optional <code>children</code>, optional why-list.</li>
+      <li><span class="tag existing">existing</span> <code>components/surfaces/HouseholdSurface.tsx</code> — renders the verdict from <code>decision.kind</code> at line 101. Wiring point.</li>
+      <li><span class="tag existing">existing</span> <code>components/surfaces/ChpSurface.tsx</code> — same component, clinical context allowed underneath.</li>
+      <li><span class="tag existing">existing</span> <code>components/CarePath.tsx</code> — referral words only through <code>describeReferral</code>.</li>
+      <li><span class="tag existing">existing</span> <code>tests/assessment.test.ts</code> — locked floor cases. Must stay unchanged and green.</li>
+      <li><span class="tag existing">existing</span> <code>vault/wave1-contract.md</code> — scope, deferrals, file ownership, exit checks.</li>
+      <li><span class="tag existing">existing</span> <code>vault/wave2-ledger.md</code> — closed doors and the evidence required to open them.</li>
+    </ul>
+
+    <h3>New Files</h3>
+    <ul>
+      <li><span class="tag new">new</span> <code>components/ContractSections.tsx</code> — renders the ten <code>RenderedSection</code> rows. No prose collapse. No new copy keys unless both languages are added together.</li>
+      <li><span class="tag new">new</span> <code>tests/contract-sections.test.tsx</code> — EN and SW labels, empty evidence shown as empty, headline unchanged.</li>
+    </ul>
+  </section>
+
+  <section id="phases">
+    <h2>Implementation Phases</h2>
+    <p><strong>IMPORTANT:</strong> Execute every phase and task step by step, in order, top to bottom.</p>
+    <p>Status markers: <code>[]</code> idle · <code>[wip]</code> in progress · <code>[x]</code> complete · <code>[f]</code> failed. All start as <code>[]</code>; the Build Plan workflow updates them as it works.</p>
+
+    <div class="phase">
+      <h3><code class="status">[]</code> Phase 1: Re-verify the spine already in the tree</h3>
+      <p>Do not rebuild wave 1. Confirm the working tree still matches the handoff, then re-run the four gates before any UI edit. If a gate fails, fix the regression in the new wiring only after this baseline is green. Do not "repair" the floor to make a later test pass.</p>
+
+      <figure>
+        <img src="tunza-architecture-as-developed/phase-verify.png" alt="Verify the existing spine before editing">
+        <figcaption>Verify first. The spine is already written.</figcaption>
+      </figure>
+
+      <h4>1. Inventory the branch</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> Confirm the repo is <code>/Users/evanmotovich/code/Tunza</code> and the branch is <code>clinical-contract-wave1</code>.</li>
+        <li><code class="status">[]</code> Confirm <code>HEAD</code> is <code>8228512</code> unless a later local commit on this same branch is recorded in an amendment. Do not reset, rebase, or push.</li>
+        <li><code class="status">[]</code> Confirm these uncommitted paths still exist and were not rewritten: <code>lib/clinical/state.ts</code>, <code>lib/clinical/reconcile.ts</code>, <code>lib/clinical/pipeline.ts</code>, <code>evals/gates.ts</code>, <code>evals/adversarial/</code>, <code>vault/wave1-handoff.md</code>, <code>vault/wave2-ledger.md</code>.</li>
+        <li><code class="status">[]</code> Confirm <code>lib/clinical/contract.ts</code> was not edited after <code>2a1812d</code>. If it differs, stop and record the diff. Do not silently accept a rewrite.</li>
+        <li><code class="status">[]</code> Confirm <code>decide()</code>, the <code>DecisionKind</code> union, and <code>tests/assessment.test.ts</code> are unchanged from <code>main</code> at <code>2a42af2</code> plus the wave-1 commits. Do not edit them in this plan.</li>
+      </ul>
+
+      <h4>2. Re-state the invariants before touching UI</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> A fixture missing any of the ten <code>SECTION_KEYS</code> fails <code>validateClinicalAssessment</code>.</li>
+        <li><code class="status">[]</code> Temperatures 37.4 then 39.2 at different timestamps both remain. Encounter state has no single <code>temperature</code> field.</li>
+        <li><code class="status">[]</code> Candidate disposition <code>self-care</code> against floor <code>go_now</code> reconciles to <code>go_now</code> with reason <code>candidate_below_floor</code>.</li>
+        <li><code class="status">[]</code> A higher unapproved candidate is not applied. Reason is <code>candidate_not_approved</code>. The returned disposition is still the floor.</li>
+        <li><code class="status">[]</code> Demo-path <code>model_id</code> and <code>knowledge_version</code> are null. Retrieved evidence is empty with <code>trust_tier: "none"</code>.</li>
+        <li><code class="status">[]</code> <code>evaluateReleaseGate</code> returns <code>promotion: "blocked"</code> and <code>release_authorization: "none"</code>.</li>
+      </ul>
+
+      <h4>3. Testing Strategy</h4>
+      <p>Use the existing toolchain only. No new dependencies. These commands prove the spine still matches the 2026-10-06 handoff before any surface change. If a command fails, fix the cause and re-run. Do not delete a failing assertion to go green.</p>
+      <ul class="checklist">
+        <li><code class="status">[]</code> <code>npx tsc --noEmit</code> — the contract, pipeline, and copy table still typecheck, including Kiswahili parity.</li>
+        <li><code class="status">[]</code> <code>npm test</code> — prior assessment cases stay green, including Kiswahili danger keywords, child-not-drinking to <code>go_now</code>, and incomplete story to <code>need_one_more_answer</code>.</li>
+        <li><code class="status">[]</code> <code>npm run lint</code> — no new lint errors in the clinical modules.</li>
+        <li><code class="status">[]</code> <code>npm run build</code> — Next.js still compiles the three routes and the client surfaces.</li>
+      </ul>
+      <div class="loop">
+        🔁 <strong>Do not exit this phase until every box above is checked.</strong>
+        If any command fails, fix the cause and re-run — loop until all pass.
+      </div>
+    </div>
+
+    <div class="phase">
+      <h3><code class="status">[]</code> Phase 2: Call the pipeline at render time</h3>
+      <p>The gap is not a missing module. <code>runClinicalPipeline</code> exists and the store ignores it. Compute the contract from the encounter the reducer already holds. Do not change what gets persisted.</p>
+
+      <figure>
+        <img src="tunza-architecture-as-developed/phase-wire.png" alt="Same verdict, pipeline beside storage">
+        <figcaption>Same verdict. The pipeline runs beside the store, not inside localStorage.</figcaption>
+      </figure>
+
+      <h4>4. Keep the reducer decision line</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> Leave <code>lib/store.tsx</code> answer handling as <code>const decision = upcoming ? null : decide(answers)</code>. The persisted <code>Encounter.decision</code> stays a <code>Decision</code>.</li>
+        <li><code class="status">[]</code> Do not add <code>ClinicalAssessment</code>, <code>ClinicalEvent[]</code>, or disagreement records to <code>CareState</code>. The localStorage write would expand stored clinical detail before the privacy projections exist.</li>
+        <li><code class="status">[]</code> Do not pass a model candidate from the UI. The demo path calls the pipeline with <code>candidate</code> omitted, so <code>model_id</code> stays null.</li>
+      </ul>
+
+      <h4>5. Add a pure view helper</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> Add a function, in <code>lib/clinical/pipeline.ts</code> or a sibling that only imports it, that accepts the current <code>Encounter</code> and locale and returns <code>PipelineResult</code>.</li>
+        <li><code class="status">[]</code> Pass <code>generatedAt: encounter.updatedAt</code>. That field is already an ISO timestamp. Do not call <code>new Date()</code> inside render; the pipeline throws if the timestamp is not explicit ISO.</li>
+        <li><code class="status">[]</code> If <code>encounter.decision</code> is null, do not run the pipeline. The question flow is still open.</li>
+        <li><code class="status">[]</code> After the call, assert <code>result.assessment.next_action.disposition === encounter.decision.kind</code>. If it differs, render the existing <code>decide()</code> verdict and do not show the contract. A mismatch is a defect, not a new headline.</li>
+        <li><code class="status">[]</code> Demo path must not emit <code>escalate</code> or <code>abstain</code>. <code>pipelineDecider</code> already throws on those. The view helper must do the same and fall back to the stored <code>Decision</code>.</li>
+      </ul>
+
+      <h4>6. Testing Strategy</h4>
+      <p>Vitest, no browser, no network. Prove the view helper is a projection of the floor, not a second decision maker.</p>
+      <ul class="checklist">
+        <li><code class="status">[]</code> <code>npm test -- tests/clinical-pipeline.test.ts tests/assessment.test.ts</code> — existing floor cases and pipeline cases still pass, and <code>tests/assessment.test.ts</code> is unmodified.</li>
+        <li><code class="status">[]</code> <code>npm test -- tests/clinical-reconcile.test.ts</code> — <code>self-care</code> against <code>go_now</code> still rewrites up, and a telemetry throw does not change the disposition.</li>
+      </ul>
+      <div class="loop">
+        🔁 <strong>Do not exit this phase until every box above is checked.</strong>
+        If any command fails, fix the cause and re-run — loop until all pass.
+      </div>
+    </div>
+
+    <div class="phase">
+      <h3><code class="status">[]</code> Phase 3: Show the ten sections without a new verdict</h3>
+      <p>The household screen already has one job: say what to do next. The contract is support. It must not become a second essay, a chat transcript, or a collapsed paragraph.</p>
+
+      <figure>
+        <img src="tunza-architecture-as-developed/phase-render.png" alt="One verdict above separate rows">
+        <figcaption>One verdict. Ten rows underneath. Not one generated paragraph.</figcaption>
+      </figure>
+
+      <h4>7. Build ContractSections from the existing component set</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> Create <code>components/ContractSections.tsx</code>. Props: <code>sections</code> from <code>renderAssessment</code>, plus locale. No new visual language. Paper card, line border, label type, same radius as <code>DecisionResult</code>.</li>
+        <li><code class="status">[]</code> Render one row per <code>SECTION_KEYS</code> entry, in that order. Use <code>section.label</code> from <code>t()</code>. Do not hard-code English.</li>
+        <li><code class="status">[]</code> Render <code>section.body</code> as structured fields. Arrays stay lists. Empty arrays stay visible as empty, including hypotheses. Do not join the ten bodies into one string.</li>
+        <li><code class="status">[]</code> Retrieved evidence renders <code>retrieval_status</code> and <code>trust_tier</code> only. Do not invent a citation. <code>items</code> is an empty tuple in this wave; the type forbids items.</li>
+        <li><code class="status">[]</code> Contradictions render claim, source, importance, and <code>resolution_status: "unresolved"</code>. Do not add a resolve button.</li>
+        <li><code class="status">[]</code> Provenance renders <code>rules_version</code>, null <code>model_id</code>, null <code>knowledge_version</code>, and <code>generated_at</code>. Do not label this "validated".</li>
+      </ul>
+
+      <h4>8. Mount it where the verdict already lives</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> In <code>HouseholdSurface</code>, keep <code>headline={decisionHeadline(decision.kind, locale)}</code>. Do not switch the headline to <code>rendered.headline</code> unless a test proves they are the same string for all four <code>DecisionKind</code> values in both locales.</li>
+        <li><code class="status">[]</code> Put <code>ContractSections</code> in the <code>children</code> slot of <code>DecisionResult</code>, inside a <code>details</code> element, closed by default. The open verdict, the one action, and the warning signs stay above it. Design rule: one dominant answer.</li>
+        <li><code class="status">[]</code> In <code>ChpSurface</code>, mount the same component expanded under the same <code>DecisionResult</code>. CHP may see the sections without an extra click. The headline is still the household headline, not a different clinical sentence.</li>
+        <li><code class="status">[]</code> Do not mount it on <code>FacilitySurface</code>. That surface speaks referral state through <code>CarePath</code> and <code>describeReferral</code>. A second clinical paragraph there would split the truth.</li>
+        <li><code class="status">[]</code> Do not add a headline for <code>abstain</code>. If the helper throws, the existing four headlines remain the only ones on screen.</li>
+        <li><code class="status">[]</code> Reuse copy keys <code>contractObservedFacts</code> through <code>contractProvenance</code>. If a new string is required, add it to both <code>en</code> and <code>sw</code> in the same edit. <code>sw</code> is <code>Record&lt;CopyKey, string&gt;</code>.</li>
+      </ul>
+
+      <h4>9. Testing Strategy</h4>
+      <p>Testing Library plus the existing contrast and copy tests. Prove language parity and that the verdict node is unchanged.</p>
+      <ul class="checklist">
+        <li><code class="status">[]</code> <code>npm test -- tests/contract-sections.test.tsx tests/components.test.tsx tests/copy.test.ts</code> — ten labels render in EN and SW, empty evidence is shown as empty, and existing component copy does not drift.</li>
+        <li><code class="status">[]</code> <code>npm test -- tests/contrast.test.ts</code> — no new raw colors. Components keep using tokens. Oxblood and emergency red stay at least 1.5× luminance apart.</li>
+      </ul>
+      <div class="loop">
+        🔁 <strong>Do not exit this phase until every box above is checked.</strong>
+        If any command fails, fix the cause and re-run — loop until all pass.
+      </div>
+    </div>
+
+    <div class="phase">
+      <h3><code class="status">[]</code> Phase 4: Leave the product boundaries where they are</h3>
+      <p>Wiring the contract must not quietly complete the README. Several neighboring systems look unfinished. They are closed on purpose.</p>
+
+      <figure>
+        <img src="tunza-architecture-as-developed/phase-boundary.png" alt="One referral, storage locked">
+        <figcaption>One referral. Three views. Storage stays the current device key.</figcaption>
+      </figure>
+
+      <h4>10. Do not cross these boundaries</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> Do not edit <code>describeReferral</code> or invent referral copy in a surface. Internal stage names never appear on screen.</li>
+        <li><code class="status">[]</code> Do not attach Google Places results to <code>referral.facilityId</code>. Nearby lookup is real. Referral facilities stay the labeled demo list until capability truth exists.</li>
+        <li><code class="status">[]</code> Do not change <code>/api/facilities</code>, <code>/api/transcribe</code>, or <code>/api/access</code>. Precise coordinates stay on device. Worker codes stay server-side. Voice still degrades server, then on-device, then type.</li>
+        <li><code class="status">[]</code> Do not add vitals, image interpretation, case history, outbreak signals, web push, or a PWA in this slice. Image attachment remains a boolean the rules do not read.</li>
+        <li><code class="status">[]</code> Do not edit <code>/Users/evanmotovich/code/medical-triage</code>. The adapter ticket at <code>vault/tickets/medical-triage-adapter.md</code> stays not started.</li>
+        <li><code class="status">[]</code> Do not edit anything under fusion-harness, including <code>adws/</code>. Do not add a training entrypoint, a dataset writer, a weight path, a retriever, or an IMCI/ETAT threshold.</li>
+        <li><code class="status">[]</code> Do not vendor guideline text. Do not put PHI, secrets, or <code>.env</code> contents in fixtures, docs, or logs.</li>
+      </ul>
+
+      <h4>11. Testing Strategy</h4>
+      <p>Diff and test boundaries. The proof is absence as much as presence.</p>
+      <ul class="checklist">
+        <li><code class="status">[]</code> <code>git diff --stat -- lib/referral.ts lib/assessment.ts lib/types.ts app/api tests/assessment.test.ts</code> — those paths show no edits from this slice.</li>
+        <li><code class="status">[]</code> <code>git -C /Users/evanmotovich/code/medical-triage status --short</code> — no new edits from this work. Pre-existing dirt stays untouched.</li>
+        <li><code class="status">[]</code> <code>npm test -- tests/referral.test.ts tests/api.test.ts tests/places.test.ts</code> — referral words, access gate, and the location-blind facility proxy still pass.</li>
+      </ul>
+      <div class="loop">
+        🔁 <strong>Do not exit this phase until every box above is checked.</strong>
+        If any command fails, fix the cause and re-run — loop until all pass.
+      </div>
+    </div>
+
+    <div class="phase">
+      <h3><code class="status">[]</code> Phase 5: Exit fail-closed</h3>
+      <p>Green engineering gates are not a release. This phase records what was wired, re-runs the full gate set, and leaves promotion blocked.</p>
+
+      <figure>
+        <img src="tunza-architecture-as-developed/phase-gates.png" alt="Engineering gates green, release blocked">
+        <figcaption>Gates can be green. Release stays blocked.</figcaption>
+      </figure>
+
+      <h4>12. Write the session note, not a release note</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> Add <code>vault/sessions/2026-10-07-architecture-wired.md</code>. State what was verified, which files changed, and that clinical effectiveness is not established.</li>
+        <li><code class="status">[]</code> Update <code>vault/INDEX.md</code> current-state paragraph. Do not claim the README capabilities that section 17 of the capability map already marked missing.</li>
+        <li><code class="status">[]</code> Do not edit <code>vault/wave2-ledger.md</code> except to append a dated line if a door's evidence actually appeared. None of those doors open because this plan's tests passed.</li>
+        <li><code class="status">[]</code> Local commit is allowed by the wave-1 contract. Push, merge, and rebase are not. Do not commit unless the four gates in the next task are green. Do not push under any result.</li>
+      </ul>
+
+      <h4>13. Testing Strategy</h4>
+      <p>Full local gates plus the release function. The release function must still refuse.</p>
+      <ul class="checklist">
+        <li><code class="status">[]</code> <code>npx tsc --noEmit</code> — view helper and new component typecheck against the existing contract.</li>
+        <li><code class="status">[]</code> <code>npm test</code> — full vitest run, including unchanged assessment cases.</li>
+        <li><code class="status">[]</code> <code>npm run lint</code> — clean.</li>
+        <li><code class="status">[]</code> <code>npm run build</code> — production build still generates the static pages.</li>
+        <li><code class="status">[]</code> <code>npm test -- tests/eval-gates.test.ts</code> — promotion remains blocked, required families that are <code>not_measurable</code> still block, and no field named <code>score</code> or <code>accuracy</code> is a ship gate.</li>
+      </ul>
+      <div class="loop">
+        🔁 <strong>Do not exit this phase until every box above is checked.</strong>
+        If any command fails, fix the cause and re-run — loop until all pass.
+      </div>
+    </div>
+  </section>
+
+  <section id="validation">
+    <h2>Validation Commands</h2>
+    <p>Execute these commands from <code>/Users/evanmotovich/code/Tunza</code> to validate the entire plan is complete:</p>
+    <ul class="checklist">
+      <li><code class="status">[]</code> <code>npx tsc --noEmit</code> — types, copy parity, and the pipeline timestamp check still hold.</li>
+      <li><code class="status">[]</code> <code>npm test</code> — floor, contract, state, reconciler, gates, copy, contrast, and the new section render all pass.</li>
+      <li><code class="status">[]</code> <code>npm run lint</code> — eslint clean.</li>
+      <li><code class="status">[]</code> <code>npm run build</code> — Next.js 16 production build succeeds.</li>
+      <li><code class="status">[]</code> <code>git diff --stat -- lib/assessment.ts lib/types.ts tests/assessment.test.ts</code> — the floor and its locked tests were not edited.</li>
+      <li><code class="status">[]</code> <code>git status --short -- lib/clinical components/ContractSections.tsx</code> — the only product change is the view helper, the section component, its test, and the two surface mounts.</li>
+    </ul>
+    <div class="loop">
+      🔁 <strong>The plan is not complete until every box is checked and every command passes. If for some reason a step is not possible to complete, mark it with [f] and move on if possible.</strong>
+    </div>
+  </section>
+
+  <section id="notes">
+    <h2>Notes</h2>
+
+    <h3>What "architecture so far" means</h3>
+    <p>Read this as three layers that already exist, plus one layer that is specified and not built.</p>
+    <table>
+      <thead>
+        <tr><th>Layer</th><th>Status</th><th>Where</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Three surfaces, EN/SW, referral machine, access gate, voice degrade, location-blind Places</td><td>On <code>main</code> through PR #7, commit <code>2a42af2</code></td><td><code>components/</code>, <code>lib/store.tsx</code>, <code>app/api/*</code></td></tr>
+        <tr><td>Ten-section contract</td><td>Committed on the branch, <code>2a1812d</code></td><td><code>lib/clinical/contract.ts</code></td></tr>
+        <tr><td>State, reconciler, adversarial fixtures, release gates, pipeline</td><td>Written, uncommitted, gates were green on 2026-10-06</td><td><code>lib/clinical/</code>, <code>evals/</code></td></tr>
+        <tr><td>Screen uses the contract</td><td>Not built. This plan.</td><td><code>HouseholdSurface</code>, <code>ChpSurface</code></td></tr>
+      </tbody>
+    </table>
+
+    <h3>Disposition table already frozen</h3>
+    <p><code>DISPOSITION_TABLE</code> in <code>lib/clinical/contract.ts</code> is the only map. Do not add a fifth headline.</p>
+    <table>
+      <thead>
+        <tr><th>Disposition</th><th>Action</th><th>Headline key</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>go_now</td><td>ESCALATE</td><td>goNow</td></tr>
+        <tr><td>get_care_today</td><td>ANSWER</td><td>getCareToday</td></tr>
+        <tr><td>monitor_at_home</td><td>ANSWER</td><td>monitorAtHome</td></tr>
+        <tr><td>need_one_more_answer</td><td>ASK</td><td>needOneMore</td></tr>
+        <tr><td>escalate</td><td>ESCALATE</td><td>goNow, reuse only</td></tr>
+        <tr><td>abstain</td><td>ABSTAIN</td><td>none</td></tr>
+      </tbody>
+    </table>
+    <p>Private urgency words are a different scale: <code>self-care</code>, <code>see-clinic</code>, <code>urgent</code>. The reconciler ranks them so they cannot downgrade the floor. Ranking is an engineering order, not a clinical severity score. Do not treat the words as synonyms in copy.</p>
+
+    <h3>Reconcile rule, already implemented</h3>
+    <pre><code>floor = decide(answers).kind
+if no candidate: return floor
+if candidate rank is missing: return floor, reason candidate_unrecognized
+if candidate rank &lt; floor rank: return floor, reason candidate_below_floor
+otherwise: return floor, reason candidate_not_approved
+fail_open is always false</code></pre>
+    <p>A safer-looking candidate is not applied in this wave. There is no approved clinical rule pack above the demo floor. <code>UNAPPROVED_CLINICAL_RULES</code> is <code>"disabled"</code>.</p>
+
+    <h3>Pipeline shape, already implemented</h3>
+    <pre><code>projectEncounter(encounter)
+append extra events, if any
+floor = decide(encounter.answers)
+reconcileWithTelemetry({ floor, candidate: null })
+validateClinicalAssessment(ten sections)
+renderAssessment(locale)  // labels via t(), collapsed: false</code></pre>
+    <p><code>rules_version</code> on this path is <code>demo-floor/unvalidated</code>. Keep that string. Do not rename it to something that sounds reviewed.</p>
+
+    <h3>Closed until evidence exists</h3>
+    <ul>
+      <li><span class="tag closed">closed</span> Retrieval ingestion. No approved source with publisher, jurisdiction, version, and effective date.</li>
+      <li><span class="tag closed">closed</span> Private-lane adapter. Ticket written. Route still cast-only, logs raw model text, no timeout, no floor.</li>
+      <li><span class="tag closed">closed</span> SFT, QLoRA, distillation, quantization. No label producer, no data-rights basis, no measured failure that training would change. A case row is not a training example.</li>
+      <li><span class="tag closed">closed</span> IMCI/ETAT numeric thresholds. Encoding them without a named clinician and a versioned rule pack would fake approval.</li>
+      <li><span class="tag closed">closed</span> JEV. External hosted decision model. Not a Tunza primitive. Not in this tree.</li>
+      <li><span class="tag closed">closed</span> Cross-encounter patient state. Would expand what localStorage holds before privacy projections exist.</li>
+    </ul>
+    <p>Opening criterion for each door is in <code>vault/wave2-ledger.md</code>. This plan cannot supply that evidence.</p>
+
+    <h3>Stale outside the repo</h3>
+    <p>The second-brain synthesis page still says Tunza is pre-build and that JEV, TypeSafe, and an H100 campaign are not in <code>~/code/Tunza</code>. The second sentence is still true: those names are not this architecture. The first sentence is not. The public app and the wave-1 contract are the architecture. A Jacob brief that described JEV and H100 as internal Tunza architecture was already filed as an overclaim. Do not revive it while wiring this slice.</p>
+    <p>Team context, not an implementation input: Ben Birnbaum owns model and eval architecture; Jacob Hirschfeld owns clinical outreach. Neither role is a substitute for the unsigned clinical review this plan refuses to invent.</p>
+
+    <h3>Rejected approaches</h3>
+    <ul>
+      <li>Replacing <code>decide()</code> with the pipeline inside the reducer. That would persist a richer clinical object and make the floor harder to lock with the existing assessment tests.</li>
+      <li>Rendering one generated explanation. The contract exists so sections cannot collapse.</li>
+      <li>Connecting the private Anthropic route in the same change. Its gaps are recorded. Fixing them is a different ticket, and it still would not be a release.</li>
+      <li>Calling the result a model. There is nothing to fine-tune.</li>
+    </ul>
+
+    <figure>
+      <img src="tunza-architecture-as-developed/notes-closed.png" alt="Five closed doors until evidence exists">
+      <figcaption>Training, retrieval, guidelines, the private route, and cross-encounter state stay closed.</figcaption>
+    </figure>
+  </section>
+
+  <section id="amendments">
+    <h2>Amendments</h2>
+    <p>None. Append-only after the first execution. Do not rewrite history here.</p>
+  </section>
+
+</main>
+</body>
+</html>
