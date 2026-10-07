@@ -2,6 +2,15 @@
 
 Dated, newest first. Each entry: what was decided, and why it holds.
 
+## 2026-10-06 — Wave 1 is an engineering contract, not a model
+The parent decision on the eval labels is: accept test-sourced labels for
+engineering-only regression, with human authorship explicitly unverified.
+They are not reviewed clinical labels. Training, retrieval ingestion, and
+guideline-threshold encoding stay closed until `vault/wave2-ledger.md` says
+their evidence exists. The demo floor in `lib/assessment.ts` remains the
+only approved path in this slice, and it is still not a clinical protocol.
+No push and no release follow from the green engineering gates.
+
 ## 2026-08-27 — CHP and facility go behind an access gate
 Per Evan: the wordmark always returns to the home page; from home a regular
 person can only enter the household path, and CHP/facility require signing
