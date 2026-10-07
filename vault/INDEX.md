@@ -27,9 +27,16 @@ a wiki, not a diary.
 | [wave2-ledger.md](wave2-ledger.md) | Deferred work and the evidence required to open it |
 | [workflows/2026-10-06-receipt.md](workflows/2026-10-06-receipt.md) | Actionable closeout for the 2026-10-06 agent-run receipt. Not a release. |
 | [tickets/medical-triage-adapter.md](tickets/medical-triage-adapter.md) | Private-lane hardening ticket. Route not edited. |
+| [claims/](claims/) | One file per active claim: which machine is on which task and paths |
 | [sessions/](sessions/) | One dated note per working session |
 
 ## Current state (update when it changes)
+
+- **2026-10-07:** wave 1 merged to `main` (PR #8, `d3d8f84`). Five machines
+  now work the repo at once through the tunza-crew mod (`tools/tunza-crew/`,
+  install steps in its README) and the live crew board:
+  https://claude.ai/artifact/Y4vxmNKpfqB7RPfrMfDAuC . Claim before editing;
+  `.gitattributes` keeps LF so Windows checkouts pass the frozen eval hash.
 
 - **2026-10-06:** branch `clinical-contract-wave1` holds an engineering
   contract around the existing demo floor. Host recovery wrote the remaining

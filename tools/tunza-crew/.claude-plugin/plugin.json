@@ -1,0 +1,20 @@
+{
+  "name": "tunza-crew",
+  "version": "0.1.0",
+  "description": "Five machines, one Tunza repo: vault digest at start, a who-is-on-what band, /claim, /release, /handoff.",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "machine": {
+      "type": "string",
+      "title": "Machine name",
+      "description": "This computer's name in claims and session notes, e.g. 5090, evan-mac, lenovo.",
+      "default": "unnamed"
+    },
+    "boardUrl": {
+      "type": "string",
+      "title": "Live board URL",
+      "description": "The shared Tunza crew board artifact; /claim, /release and /handoff ask Claude to mirror changes there.",
+      "default": "https://claude.ai/artifact/Y4vxmNKpfqB7RPfrMfDAuC"
+    }
+  }
+}

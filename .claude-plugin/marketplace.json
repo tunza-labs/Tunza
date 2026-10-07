@@ -1,0 +1,11 @@
+{
+  "name": "tunza-labs",
+  "owner": { "name": "Tunza Labs" },
+  "plugins": [
+    {
+      "name": "tunza-crew",
+      "source": "./tools/tunza-crew",
+      "description": "Five machines, one Tunza repo: vault digest at start, a who-is-on-what band, /claim, /release, /checkin, /handoff."
+    }
+  ]
+}
