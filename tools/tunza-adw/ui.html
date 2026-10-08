@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tunza ADW</title>
+<style>
+:root {
+  --brand-deep: #4a1210; --action: #7c1f18; --urgent: #ff6b5e; --paper: #f4efe6;
+  --paper-soft: #e6d6c8; --muted: #d4b5aa; --card: rgba(30, 6, 5, .38); --line: rgba(244, 239, 230, .18);
+  --fill: #f4efe6; --band: rgba(244, 239, 230, .16); --amber: #f2b45a;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, "SF Mono", monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  min-height: 100vh; color: var(--paper);
+  background: radial-gradient(120% 90% at 0% 0%, var(--action) 0%, var(--brand-deep) 70%) fixed, var(--brand-deep);
+  font: 14px/1.5 "InterVariable", Inter, "Segoe UI", system-ui, sans-serif;
+}
+header { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; justify-content: space-between;
+  padding: 18px 24px 0; max-width: 1400px; margin: 0 auto; }
+h1 { font-size: 22px; margin: 0; font-weight: 650; letter-spacing: -.01em; }
+.sub { color: var(--muted); font-size: 13px; }
+main { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; padding: 16px 24px 32px;
+  max-width: 1400px; margin: 0 auto; }
+@media (max-width: 900px) { main { grid-template-columns: 1fr; padding: 12px 16px 24px; } header { padding: 14px 16px 0; } }
+.panel { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
+h2 { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
+.col { display: grid; gap: 16px; align-content: start; min-width: 0; }
+button { font: inherit; font-weight: 600; color: var(--brand-deep); background: var(--paper); border: 0; border-radius: 6px;
+  padding: 8px 14px; cursor: pointer; }
+button.ghost { background: transparent; color: var(--paper); border: 1px solid var(--line); }
+button:disabled { opacity: .45; cursor: not-allowed; }
+select { font: inherit; color: var(--paper); background: rgba(0,0,0,.25); border: 1px solid var(--line); border-radius: 6px; padding: 7px 8px; }
+label.chk { display: inline-flex; gap: 6px; align-items: center; color: var(--paper-soft); font-size: 13px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.phases { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.phases li { display: grid; grid-template-columns: 46px 1fr auto; gap: 10px; align-items: center; padding: 8px 10px;
+  border: 1px solid var(--line); border-radius: 6px; }
+.mark { font-family: var(--mono); font-weight: 700; text-align: center; }
+.mark.x { color: var(--paper); } .mark.f { color: var(--urgent); } .mark.wip { color: var(--amber); } .mark.idle { color: var(--muted); }
+.tag { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 6px; white-space: nowrap; }
+.seats { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 8px; }
+.seat { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
+.seat .n { font-size: 11px; color: var(--muted); }
+.seat .s { font-weight: 600; }
+.seat.ok { border-color: rgba(244,239,230,.55); } .seat.fail { border-color: var(--urgent); } .seat.live { border-color: var(--amber); }
+pre.log { margin: 0; max-height: 300px; overflow: auto; font: 12px/1.45 var(--mono); color: var(--paper-soft);
+  background: rgba(0,0,0,.28); border-radius: 6px; padding: 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.big { font-size: 40px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.unit { font-size: 15px; color: var(--muted); font-weight: 500; }
+.meter { position: relative; height: 22px; background: rgba(0,0,0,.3); border-radius: 5px; overflow: hidden; margin: 10px 0 4px; }
+.meter > i { position: absolute; inset: 0 auto 0 0; background: var(--fill); width: 0; transition: width .6s ease; }
+.meter > b { position: absolute; top: 0; bottom: 0; background: var(--band); border-left: 1px dashed var(--paper); border-right: 1px dashed var(--paper); }
+.meter.hot > i { background: var(--urgent); }
+.scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin-top: 12px; }
+.tile { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
+.tile .k { font-size: 11px; color: var(--muted); } .tile .v { font-size: 18px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.advice { border-left: 4px solid var(--paper); padding: 10px 12px; background: rgba(0,0,0,.22); border-radius: 0 6px 6px 0; font-weight: 600; }
+.advice.danger { border-color: var(--urgent); } .advice.headroom { border-color: var(--amber); } .advice.idle { border-color: var(--muted); }
+canvas { width: 100%; height: 150px; display: block; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+td, th { text-align: left; padding: 4px 6px; border-top: 1px solid var(--line); } th { color: var(--muted); font-weight: 500; }
+.err { color: var(--amber); }
+</style>
+</head>
+<body>
+<header>
+  <div><h1>Tunza ADW</h1><div class="sub">7-agent workflow for the model build plan · RTX 5090 · runs on this machine only</div></div>
+  <div class="sub" id="gate">gate: …</div>
+</header>
+<main>
+  <section class="col" aria-label="Workflows">
+    <div class="panel">
+      <h2>Run</h2>
+      <div class="row">
+        <button id="b-next">Run next phase</button>
+        <select id="phase-pick" aria-label="Phase"></select>
+        <button id="b-phase" class="ghost">Run this phase</button>
+        <button id="b-all" class="ghost">Run all</button>
+        <button id="b-stop" class="ghost" disabled>Stop</button>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label class="chk"><input type="checkbox" id="dry"> Dry run (no model calls)</label>
+        <label class="chk"><input type="checkbox" id="push"> Push branch when accepted</label>
+      </div>
+      <div class="sub" id="run-state" style="margin-top:8px">idle</div>
+    </div>
+    <div class="panel">
+      <h2>Agents</h2>
+      <div class="seats" id="seats"></div>
+    </div>
+    <div class="panel">
+      <h2>Plan phases</h2>
+      <ul class="phases" id="phases"></ul>
+    </div>
+    <div class="panel">
+      <h2>Live log</h2>
+      <pre class="log" id="log">no run yet</pre>
+    </div>
+  </section>
+
+  <section class="col" aria-label="Model memory">
+    <div class="panel">
+      <h2>GPU memory · the model</h2>
+      <div class="big" id="vram">–<span class="unit"> / – GB</span></div>
+      <div class="meter" id="vram-meter"><b id="vram-band"></b><i id="vram-fill"></i></div>
+      <div class="scale"><span>0</span><span>target 85–92%</span><span id="vram-max">–</span></div>
+      <div class="advice" id="advice" style="margin-top:12px">waiting for nvidia-smi…</div>
+      <div class="tiles">
+        <div class="tile"><div class="k">GPU busy</div><div class="v" id="util">–</div></div>
+        <div class="tile"><div class="k">Power</div><div class="v" id="power">–</div></div>
+        <div class="tile"><div class="k">SM clock</div><div class="v" id="clock">–</div></div>
+        <div class="tile"><div class="k">Temp</div><div class="v" id="temp">–</div></div>
+        <div class="tile"><div class="k">Throttle</div><div class="v" id="throttle">–</div></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>System RAM</h2>
+      <div class="big" id="ram">–<span class="unit"> / – GB</span></div>
+      <div class="meter"><i id="ram-fill"></i></div>
+      <div class="sub">Used for data loading and offloaded checkpoints. It does not add GPU memory.</div>
+    </div>
+    <div class="panel">
+      <h2>Last 10 minutes</h2>
+      <canvas id="hist" aria-label="GPU memory, GPU busy and RAM over time"></canvas>
+      <div class="sub">solid: GPU memory % · dashed: GPU busy % · dotted: RAM %</div>
+    </div>
+    <div class="panel">
+      <h2>Processes on the GPU</h2>
+      <table><thead><tr><th>pid</th><th>process</th><th>GPU memory</th></tr></thead><tbody id="procs"><tr><td colspan="3">–</td></tr></tbody></table>
+    </div>
+  </section>
+</main>
+<script>
+(function () {
+  var SEATS = ["scout", "planner", "builder", "tuner", "gatekeeper", "reviewer", "documenter"];
+  var hist = [], $ = function (id) { return document.getElementById(id); };
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); }
+  function gb(mib) { return mib == null ? "–" : (mib / 1024).toFixed(1); }
+
+  async function getJSON(url, opts) { var r = await fetch(url, opts); if (!r.ok) throw new Error(await r.text()); return r.json(); }
+
+  async function metrics() {
+    try {
+      var m = await getJSON("/api/metrics"), g = m.gpu || {};
+      if (g.available) {
+        var pct = 100 * g.mem_used_mib / g.mem_total_mib;
+        $("vram").innerHTML = gb(g.mem_used_mib) + '<span class="unit"> / ' + gb(g.mem_total_mib) + " GB · " + pct.toFixed(0) + "%</span>";
+        $("vram-fill").style.width = pct.toFixed(1) + "%";
+        $("vram-meter").classList.toggle("hot", pct > 95);
+        $("vram-band").style.left = "85%"; $("vram-band").style.width = "7%";
+        $("vram-max").textContent = gb(g.mem_total_mib) + " GB";
+        $("util").textContent = g.util_pct + "%";
+        $("power").textContent = Math.round(g.power_w) + " / " + Math.round(g.power_limit_w) + " W";
+        $("clock").textContent = g.sm_mhz + " MHz";
+        $("temp").textContent = g.temp_c + " °C";
+        $("throttle").textContent = g.throttle ? "yes" : "no";
+      } else {
+        $("vram").innerHTML = '–<span class="unit"> nvidia-smi not available here</span>';
+      }
+      var a = m.advice || {};
+      $("advice").className = "advice " + (a.level || ""); $("advice").textContent = a.text || "";
+      var r = m.ram || {};
+      if (r.total_gb) {
+        $("ram").innerHTML = (r.used_gb == null ? "–" : r.used_gb.toFixed(1)) + '<span class="unit"> / ' + r.total_gb.toFixed(0) + " GB</span>";
+        $("ram-fill").style.width = (r.used_gb == null ? 0 : 100 * r.used_gb / r.total_gb).toFixed(1) + "%";
+      }
+      $("procs").innerHTML = (m.procs || []).length ? m.procs.map(function (p) {
+        return "<tr><td>" + esc(p.pid) + "</td><td>" + esc(p.name) + "</td><td>" + gb(p.used_mib) + " GB</td></tr>"; }).join("")
+        : '<tr><td colspan="3">no process is using the GPU</td></tr>';
+      hist.push({ v: g.available ? 100 * g.mem_used_mib / g.mem_total_mib : null, u: g.available ? g.util_pct : null,
+                  r: r.total_gb && r.used_gb != null ? 100 * r.used_gb / r.total_gb : null });
+      if (hist.length > 300) hist.shift();
+      draw();
+    } catch (e) { $("advice").textContent = "metrics error: " + e.message; }
+  }
+
+  function draw() {
+    var c = $("hist"), g = c.getContext("2d"), dpr = Math.min(devicePixelRatio || 1, 2), W = c.clientWidth, H = c.clientHeight;
+    c.width = W * dpr; c.height = H * dpr; g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    g.fillStyle = "rgba(244,239,230,.10)"; g.fillRect(0, H * (1 - .92), W, H * .07);
+    g.strokeStyle = "rgba(244,239,230,.15)"; g.lineWidth = 1;
+    [0, .5, 1].forEach(function (f) { g.beginPath(); g.moveTo(0, H * f); g.lineTo(W, H * f); g.stroke(); });
+    function line(key, dash, width) {
+      g.setLineDash(dash); g.lineWidth = width; g.strokeStyle = "#f4efe6"; g.beginPath(); var on = false;
+      hist.forEach(function (p, i) { var v = p[key]; if (v == null) { on = false; return; }
+        var x = W * i / 299, y = H * (1 - v / 100); if (!on) { g.moveTo(x, y); on = true; } else g.lineTo(x, y); });
+      g.stroke(); g.setLineDash([]);
+    }
+    line("v", [], 2); line("u", [6, 4], 1.2); line("r", [2, 3], 1.2);
+  }
+
+  function seatState(receipt, active) {
+    var by = {}; (receipt && receipt.steps || []).forEach(function (s) { by[s.step] = s; });
+    var next = SEATS.find(function (n) { return !by[n]; });
+    return SEATS.map(function (n, i) {
+      var s = by[n], cls = s ? (s.ok ? "ok" : "fail") : (active && n === next ? "live" : "");
+      var label = s ? (s.ok ? "done" + (s.cost_usd ? " · $" + s.cost_usd.toFixed(2) : "") : "failed") : (cls === "live" ? "working…" : "waiting");
+      if (n === "tuner" && by.tuner && by.tuner.owner === "code") label = "not needed";
+      return '<div class="seat ' + cls + '"><div class="n">' + (i + 1) + " of 7</div><div class=\"s\">" + n + '</div><div class="n">' + label + "</div></div>";
+    }).join("");
+  }
+
+  async function state() {
+    try {
+      var s = await getJSON("/api/state");
+      $("gate").textContent = "clinical gate: " + s.gate.state + " (" + s.gate.why + ")";
+      var pick = $("phase-pick"), cur = pick.value;
+      pick.innerHTML = s.phases.map(function (p) { return '<option value="' + p.number + '">Phase ' + p.number + "</option>"; }).join("");
+      if (cur) pick.value = cur;
+      $("phases").innerHTML = s.phases.map(function (p) {
+        var m = p.status || "idle", shown = p.status ? "[" + p.status + "]" : "[ ]";
+        return '<li><span class="mark ' + esc(m) + '">' + esc(shown) + "</span><span>Phase " + p.number + ": " + esc(p.name) +
+          '</span><span class="row">' + (p.gpu ? '<span class="tag">GPU</span>' : "") + (p.gated ? '<span class="tag">gated</span>' : "") + "</span></li>";
+      }).join("");
+      var run = s.run || {}, active = !!run.active;
+      $("seats").innerHTML = seatState(run.receipt, active);
+      $("run-state").innerHTML = active ? "running: " + esc(run.cmd) + " · started " + esc(run.started)
+        : (run.exit_code == null ? "idle" : "last run exited " + run.exit_code + (run.exit_code === 0 ? " (ok)" : " (see log)"));
+      ["b-next", "b-phase", "b-all"].forEach(function (id) { $(id).disabled = active; });
+      $("b-stop").disabled = !active;
+      if (run.log_tail != null) { var el = $("log"), stick = el.scrollTop + el.clientHeight >= el.scrollHeight - 8;
+        el.textContent = run.log_tail || "…"; if (stick) el.scrollTop = el.scrollHeight; }
+    } catch (e) { $("run-state").innerHTML = '<span class="err">state error: ' + esc(e.message) + "</span>"; }
+  }
+
+  function start(mode) {
+    var body = { mode: mode, phase: Number($("phase-pick").value), dry_run: $("dry").checked, push: $("push").checked };
+    getJSON("/api/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+      .then(state).catch(function (e) { alert(e.message); });
+  }
+  $("b-next").onclick = function () { start("next"); };
+  $("b-phase").onclick = function () { start("phase"); };
+  $("b-all").onclick = function () { if (confirm("Run every remaining phase in order until one stops?")) start("all"); };
+  $("b-stop").onclick = function () { if (confirm("Stop the running workflow?")) getJSON("/api/stop", { method: "POST" }).then(state); };
+
+  metrics(); state();
+  setInterval(metrics, 2000); setInterval(state, 2000);
+  addEventListener("resize", draw);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plan: Tunza Model Build and Full GPU Use</title>
+<style>
+  :root {
+    --bg: #f4f7f8; --ink: #0d1b20; --muted: #53656d; --line: #d3dde1;
+    --card: #ffffff; --signal: #0b7d8c; --warm: #b35a00; --ok: #2a7a3b; --bad: #b3261e;
+    --code-bg: #e8eff1;
+    --font: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #061015; --ink: #e5eef1; --muted: #98b0b8; --line: #1d3138;
+      --card: #0b1a20; --signal: #5ee0f2; --warm: #ffb265; --ok: #7ee39a; --bad: #ff8a80;
+      --code-bg: #10242b; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #061015; --ink: #e5eef1; --muted: #98b0b8; --line: #1d3138;
+    --card: #0b1a20; --signal: #5ee0f2; --warm: #ffb265; --ok: #7ee39a; --bad: #ff8a80;
+    --code-bg: #10242b; color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 15px/1.6 var(--font); }
+  main { max-width: 980px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 28px; margin: 0 0 8px; font-weight: 600; }
+  h2 { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--signal); margin: 40px 0 12px; font-weight: 600; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+  h3 { font-size: 18px; margin: 24px 0 8px; }
+  h4 { font-size: 15px; margin: 18px 0 6px; }
+  p, li { max-width: 78ch; }
+  a { color: var(--signal); }
+  code { font-family: var(--mono); font-size: 13px; background: var(--code-bg); padding: 1px 5px; border-radius: 3px; overflow-wrap: anywhere; }
+  pre { background: var(--code-bg); padding: 12px 14px; border-radius: 6px; overflow-x: auto; font: 13px/1.5 var(--mono); }
+  pre code { background: none; padding: 0; }
+  figure { margin: 20px auto; text-align: center; }
+  figure img { max-width: 100%; height: auto; border-radius: 6px; border: 1px solid var(--line); display: block; margin: 0 auto; }
+  figcaption { color: var(--muted); font-size: 13px; margin-top: 6px; }
+  .meta { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 8px 14px; margin-top: 12px; }
+  .meta summary { cursor: pointer; color: var(--muted); }
+  .meta dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 10px 0 4px; font-size: 13px; }
+  .meta dt { color: var(--muted); }
+  .meta dd { margin: 0; font-family: var(--mono); overflow-wrap: anywhere; }
+  .phase { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--signal); border-radius: 6px; padding: 4px 20px 16px; margin: 20px 0; }
+  .phase h3 { margin-top: 16px; }
+  .checklist { list-style: none; padding-left: 0; }
+  .checklist li { margin: 6px 0; padding-left: 0; }
+  .status { color: var(--warm); font-weight: 600; }
+  .loop { border: 1px dashed var(--warm); border-radius: 6px; padding: 10px 14px; margin-top: 12px; font-size: 14px; }
+  .tag { font: 600 11px var(--mono); text-transform: uppercase; padding: 1px 6px; border-radius: 3px; }
+  .tag.existing { background: var(--code-bg); color: var(--muted); }
+  .tag.new { background: var(--signal); color: var(--bg); }
+  .files ul { padding-left: 18px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; margin: 10px 0; display: block; overflow-x: auto; }
+  th, td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; vertical-align: top; }
+  th { background: var(--code-bg); }
+  .callout { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--warm); border-radius: 6px; padding: 10px 16px; margin: 16px 0; }
+  .callout.stop { border-left-color: var(--bad); }
+  details { margin: 8px 0; }
+  details > summary { cursor: pointer; }
+</style>
+</head>
+<body>
+<main>
+
+  <!-- ===== HEADER + UPDATABLE METADATA ===== -->
+  <header>
+    <h1>Plan: Tunza Model Build and Full GPU Use</h1>
+    <p style="color:var(--muted);margin:0">How to build the Tunza decision model on the rented Blackwell box, and how to keep that GPU busy and efficient.</p>
+    <details class="meta">
+      <summary>Metadata</summary>
+      <dl>
+        <dt>created</dt>      <dd>2026-10-08T19:10:00-04:00</dd>
+        <dt>modified</dt>     <dd>2026-10-08T19:10:00-04:00, 2026-10-08T19:40:00-04:00</dd>
+        <dt>commits</dt>      <dd>uncommitted (base 96c25a1 on docs/tunza-eval-build-prompt; origin/main 879a3af)</dd>
+        <dt>agent name</dt>        <dd>claude-code (claude-opus-5-5)</dd>
+        <dt>session id</dt>      <dd>46f11dff-d765-45dc-b2e9-7ec1523b7ffc</dd>
+        <dt>back refs</dt>    <dd>vault/training.md, evals/BUILD-PROMPT.md, vault/wave1-contract.md, vault/capability-map.md, specs/tunza-architecture-as-developed.html, second-brain wiki/nodes/projects/tunza-model-plan.md, wiki/nodes/methods/tunza-eval-two-scorecards.md, wiki/nodes/projects/tunza-gpu-rental.md, Tunza Training Live Board (claude.ai/artifact/WZGgHZji5yxo778XfhboKG)</dd>
+        <dt>forward refs</dt> <dd>tools/tunza-adw/ (7-agent ADW that executes this plan, with the red dashboard)</dd>
+      </dl>
+    </details>
+  </header>
+
+  <!-- Hero image — synced to the :root visual identity. Replace with <img> once generated. -->
+  <figure>
+    <!-- {{HERO_IMAGE: one Blackwell GPU feeding a small adapter onto a base model, guarded by a safety floor; teal on dark slate}} -->
+    <figcaption>One rented Blackwell card, one small adapter on a strong base model, and a rules floor the model can never go below.</figcaption>
+  </figure>
+
+  <!-- ===== PURPOSE / PROBLEM / SOLUTION ===== -->
+  <section id="purpose">
+    <h2>Purpose</h2>
+    <p>This plan answers two questions. First, how Tunza should build its model: which base model, what the model actually does inside the product, what data it trains on, and when it is allowed to train. Second, how to get full use out of the rented GPU, meaning each run is efficient and the card is busy most of the day. The second part also produces the utilization record that the buy-or-rent decision needs (Ben's bar is 2 to 4 weeks above 50 to 70 percent).</p>
+  </section>
+
+  <section id="problem">
+    <h2>Problem</h2>
+    <p>A LoRA run is already reporting to the live board, but the repo still has no training code, no data pipeline, no model choice on record, and no hardware receipt. Six facts make "just train it" unsafe or wasteful:</p>
+    <ol>
+      <li><strong>The card is unverified.</strong> "5090" is a remote desktop label. An RTX 5090 has <strong>32 GB</strong> of GPU memory. A 96 GB Blackwell card is the <strong>RTX PRO 6000</strong>. The two cards call for different plans: the PRO 6000 has 3x the memory and about 2.4x the dense BF16 compute (about 504 vs 210 TFLOPS). "96 GB" may also be the PC's system RAM, which does not help GPU training much. <code>nvidia-smi</code> has never been run.</li>
+      <li><strong>The box runs Windows.</strong> Blackwell (sm_120) training works best on Linux. Native Windows works through Unsloth's Windows path, but bitsandbytes 4-bit on Windows Blackwell is not confirmed. WSL2 has an open bug: on an RTX PRO 6000 the CUDA context took about 16 GiB, versus 1 to 2 GiB on native Linux (microsoft/WSL#40401).</li>
+      <li><strong>Training is closed on paper.</strong> <code>evals/BUILD-PROMPT.md</code> section 7 keeps the fine-tune slot <code>blocked</code> until five things are written by people: Y, the product, a clinician-signed protocol pack and ceiling, a data-rights note, and a sealed held-out gold set.</li>
+      <li><strong>No measured utilization.</strong> The board shows tokens per second but not how busy the GPU is or what fraction of its peak compute is used (MFU). So nobody can tell a slow run from a run starved by a bottleneck.</li>
+      <li><strong>Swahili is the hard part, not size.</strong> AfriMed-QA is English-only, and no public benchmark measures Swahili or code-switched community health worker (CHW) triage. A bigger model does not fix that. Our own <code>en</code>, <code>sw</code> and <code>codeswitch</code> strata do.</li>
+      <li><strong>The product needs a small model.</strong> CHW phones and clinics with poor connectivity favor a 4B to 12B model. A 70B model trained on a few thousand labeled cases would be slower and no safer.</li>
+    </ol>
+    <figure>
+      <!-- {{PROBLEM_IMAGE: unverified GPU label with question mark between 32 GB and 96 GB cards, a closed gate beside it}} -->
+      <figcaption>The card is still unverified (32 GB or 96 GB) and the gate is still closed. Both shape every later step.</figcaption>
+    </figure>
+  </section>
+
+  <section id="solution">
+    <h2>Solution</h2>
+    <p><strong>What the model does.</strong> The model reads an encounter (typed or transcribed, in English, Swahili or code-switched) and returns strict JSON with three things: the danger facts it found, a proposed disposition from the contract's six (<code>go_now</code>, <code>get_care_today</code>, <code>monitor_at_home</code>, <code>need_one_more_answer</code>, <code>escalate</code>, <code>abstain</code>), and the one question to ask next. It does not make the final call. <code>lib/clinical/reconcile.ts</code> applies the <code>decide()</code> floor: a lower proposal is rewritten up, and a downgrade never ships. The model's value is reading messy bilingual input that keyword rules miss and asking the right next question. It is not there to overrule the floor.</p>
+    <p><strong>How it is built.</strong> Start from a strong open base model and train one LoRA adapter with supervised fine-tuning, as the 2026-09-10 plan set. Untuned candidates are first compared on our own two scorecards. The clinical fine-tune runs only after the five opening criteria exist. Until then the GPU does engineering work: the stack, the throughput tuning, the untuned bake-off, and pipeline shakedown runs on public non-clinical data whose weights are thrown away.</p>
+    <p><strong>How the GPU stays full.</strong> Two layers. <em>Within a run:</em> BF16 LoRA when the model fits (no 4-bit dequantize cost), padding-free packing with FlashAttention, the largest micro-batch that fits in about 90 percent of memory, fused kernels (Unsloth or Liger) including chunked cross-entropy, a pre-tokenized dataset, and no per-step GPU syncs for logging. Each lever is measured by MFU. <em>Across the day:</em> a job queue that runs training, then evals, then the next sweep config without gaps, plus a utilization logger whose daily busy percentage feeds the rent-or-buy decision.</p>
+    <figure>
+      <!-- {{SOLUTION_IMAGE: bilingual encounter text into small model, JSON out, rules floor clamps disposition upward}} -->
+      <figcaption>The model proposes, the floor clamps upward, and the reconciler ships the safer of the two.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ===== RELEVANT FILES ===== -->
+  <section id="files" class="files">
+    <h2>Relevant Files</h2>
+
+    <h3>Existing Files</h3>
+    <ul>
+      <li><span class="tag existing">existing</span> <code>evals/BUILD-PROMPT.md</code> — Hardware rules for the box (sections 2 and 6), the two scorecards (5), and the opening criteria (7) this plan must not satisfy by itself.</li>
+      <li><span class="tag existing">existing</span> <code>evals/runner.ts</code>, <code>evals/gates.ts</code>, <code>evals/manifest.json</code> — Fail-closed eval harness. Candidate model outputs are scored here, with no aggregate score field.</li>
+      <li><span class="tag existing">existing</span> <code>lib/clinical/contract.ts</code> — The six dispositions. Model output is constrained to exactly this enum.</li>
+      <li><span class="tag existing">existing</span> <code>lib/clinical/reconcile.ts</code> — Floor wins. The model can never lower a disposition.</li>
+      <li><span class="tag existing">existing</span> <code>lib/assessment.ts</code> (<code>decide()</code>) and <code>lib/types.ts</code> — Regression floor. Read only, never edited.</li>
+      <li><span class="tag existing">existing</span> <code>vault/wave1-contract.md</code>, <code>vault/capability-map.md</code> — Record training as deferred and fine-tuning infrastructure as missing. This plan fills that gap, still under the gate.</li>
+      <li><span class="tag existing">existing</span> <code>vault/training.md</code> — Live board facts. Updated by Phase 0 and Phase 2.</li>
+      <li><span class="tag existing">existing</span> <code>.gitattributes</code> — LF endings, so Windows checkouts keep the frozen eval hash.</li>
+    </ul>
+
+    <h3>New Files</h3>
+    <ul>
+      <li><span class="tag new">new</span> <code>training/README.md</code> — How to run everything on the box in PowerShell, and what never goes in this public repo (data, adapters, run logs).</li>
+      <li><span class="tag new">new</span> <code>training/.gitignore</code> — Ignores <code>data/</code>, <code>runs/</code>, <code>adapters/</code> and <code>*.safetensors</code>.</li>
+      <li><span class="tag new">new</span> <code>training/env/check_gpu.py</code> — Hardware receipt: <code>nvidia-smi</code> output, <code>torch.cuda.get_arch_list()</code> includes <code>sm_120</code>, free memory, a BF16 matmul microbenchmark in TFLOPS, and a bitsandbytes 4-bit smoke test.</li>
+      <li><span class="tag new">new</span> <code>training/env/requirements-blackwell.txt</code> — Pinned stack: PyTorch on CUDA 12.8 or newer, Unsloth, flash-attn 2.8.1 or newer with sm_120 kernels, torchao 0.17 or newer if CUDA 13.</li>
+      <li><span class="tag new">new</span> <code>training/telemetry.py</code> — Writes <code>runs/&lt;tag&gt;/telemetry.jsonl</code> in the board's existing format, plus <code>gpu_util</code>, <code>power_w</code>, <code>sm_clock_mhz</code>, <code>throttle</code>, <code>mfu</code>. Logs every N steps, never with a per-step <code>.item()</code> sync.</li>
+      <li><span class="tag new">new</span> <code>training/gpu_util_logger.ps1</code> — Polls <code>nvidia-smi</code> every 10 s into a daily CSV. Daily busy percentage is the rent-or-buy number.</li>
+      <li><span class="tag new">new</span> <code>training/queue/runner.py</code> and <code>training/queue/jobs/*.yaml</code> — One-GPU job queue: training, then eval, then the next config, with no idle gap.</li>
+      <li><span class="tag new">new</span> <code>training/bench/throughput_matrix.py</code> — The lever-by-lever throughput benchmark (Phase 3).</li>
+      <li><span class="tag new">new</span> <code>training/configs/shakedown.yaml</code>, <code>bakeoff.yaml</code>, <code>sft-gated.yaml</code> — One config per job type.</li>
+      <li><span class="tag new">new</span> <code>training/data/schema.py</code> — Row shape: encounter text, language stratum, facts available at decision time, Y (stays unset until Evan names it), provenance, consent and data-rights ID.</li>
+      <li><span class="tag new">new</span> <code>training/gate.py</code> — Refuses to start any job tagged <code>clinical</code> unless <code>training/OPENING-CRITERIA.json</code> has all five fields signed by named people. Agents never write that file.</li>
+      <li><span class="tag new">new</span> <code>training/sft.py</code> — The LoRA SFT entry point with assistant-only loss and grammar-constrained JSON at eval time.</li>
+      <li><span class="tag new">new</span> <code>training/eval_candidate.py</code> — Runs a model or adapter on the locked rows and writes JSONL for <code>evals/runner.ts</code>.</li>
+    </ul>
+  </section>
+
+  <!-- ===== IMPLEMENTATION PHASES ===== -->
+  <section id="phases">
+    <h2>Implementation Phases</h2>
+    <p><strong>IMPORTANT:</strong> Execute every phase and task step by step, in order, top to bottom.</p>
+    <p>Status markers: <code>[]</code> idle · <code>[wip]</code> in progress · <code>[x]</code> complete · <code>[f]</code> failed. All start as <code>[]</code>; the Build Plan workflow updates them as it works.</p>
+
+    <!-- Phase 0 -->
+    <div class="phase">
+      <h3><code class="status">[]</code> Phase 0: Hardware receipt and inventory of the live run</h3>
+      <p>Prove which card is in the box and what the run on the board is. Every number later in this plan depends on the answer. Run this on the box, in PowerShell, by a human or an agent the human has explicitly sent there.</p>
+      <figure>
+        <!-- {{PHASE_IMAGE: fork in the road labeled 32 GB and 96 GB after a terminal receipt}} -->
+        <figcaption>One command decides the branch: 32 GB means a 4B to 12B model in BF16, 96 GB means up to 31B in BF16.</figcaption>
+      </figure>
+
+      <h4>0.1. Hardware receipt</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> Run <code>nvidia-smi</code> and <code>nvidia-smi -q -d MEMORY,CLOCK,POWER,PERFORMANCE</code>. Save both outputs to <code>vault/sessions/</code> without the host name or IP.</li>
+        <li><code class="status">[]</code> Record the card name, total memory, driver, CUDA version, power limit, and system RAM (<code>Get-CimInstance Win32_ComputerSystem</code>).</li>
+        <li><code class="status">[]</code> Branch: <strong>32 GB</strong> (RTX 5090) uses the 32 GB column of the model table in Notes. <strong>About 96 GB</strong> (RTX PRO 6000) uses the 96 GB column. Anything else: stop and report the real chip, per <code>BUILD-PROMPT.md</code> rule 2.</li>
+      </ul>
+
+      <h4>0.2. Inventory the run already on the board</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> Write into <code>vault/training.md</code>: the script path, base model, dataset and its source, LoRA rank and targets, learning rate, sequence length, batch size, 4-bit or BF16, and whether it runs in native Windows, WSL2 or Docker.</li>
+        <li><code class="status">[]</code> If its dataset is clinical, or of unknown origin, label the run <code>shakedown</code> in the vault and do not promote its adapter. Stopping it is Evan's call.</li>
+      </ul>
+
+      <h4>0.3. Testing Strategy</h4>
+      <p>Evidence is saved command output, not a remembered label. The edge case is a card that reports less memory than its spec (a 5090 D V2 has 24 GB, and a Max-Q PRO 6000 has lower clocks). The receipt must show the exact name and MiB.</p>
+      <ul class="checklist">
+        <li><code class="status">[]</code> <code>nvidia-smi --query-gpu=name,memory.total,driver_version,power.limit --format=csv</code> — Proves the chip and memory. Name contains 5090 or PRO 6000, and memory is at least 30000 MiB.</li>
+        <li><code class="status">[]</code> <code>grep -n "Base model" vault/training.md</code> — Proves the live run is now documented.</li>
+      </ul>
+      <div class="loop">
+        🔁 <strong>Do not exit this phase until every box above is checked.</strong>
+        If any command fails, fix the cause and re-run — loop until all pass.
+      </div>
+    </div>
+
+    <!-- Phase 1 -->
+    <div class="phase">
+      <h3><code class="status">[]</code> Phase 1: A pinned Blackwell training stack on the box</h3>
+      <p>Get one reproducible stack that sees sm_120, uses FlashAttention, and leaves the most GPU memory free. Order of preference: (1) native Windows with Unsloth's documented Windows install, if <code>check_gpu.py</code> passes; (2) the Unsloth Docker image on WSL2; (3) ask the provider for a Linux image. On a 96 GB card, measure the WSL2 context overhead before choosing WSL2, because of the 16 GiB bug.</p>
+
+      <h4>1.1. Install and pin</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> Create a Python 3.11 or 3.12 venv in <code>training/.venv</code>. Install PyTorch built for CUDA 12.8 or newer, then Unsloth, then flash-attn 2.8.1 or newer.</li>
+        <li><code class="status">[]</code> Freeze the exact versions into <code>training/env/requirements-blackwell.txt</code>.</li>
+        <li><code class="status">[]</code> Set Windows power plan to High performance, turn on hardware-accelerated GPU scheduling, and close GPU-heavy apps. The Chrome Remote Desktop session also uses the GPU for encoding, so disconnect during long runs.</li>
+      </ul>
+
+      <h4>1.2. Hardware receipt script</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> Write <code>training/env/check_gpu.py</code>: print the arch list (must include <code>sm_120</code>), free and total memory after creating the CUDA context, an 8192x8192 BF16 matmul loop reporting achieved TFLOPS, a flash-attn forward and backward on a toy tensor, and a bitsandbytes 4-bit linear forward.</li>
+        <li><code class="status">[]</code> If bitsandbytes fails, mark 4-bit as unavailable and use BF16 or 8-bit only. Do not chase a 4-bit build on this phase's clock.</li>
+      </ul>
+
+      <h4>1.3. Testing Strategy</h4>
+      <p>The script is the test. Edge cases: a PyTorch wheel without sm_120 (falls back with a "no kernel image" error), flash-attn installed but silently replaced by SDPA, and WSL2 hiding overhead from <code>mem_get_info</code>. Compare free memory against <code>nvidia-smi</code>, not only against PyTorch.</p>
+      <ul class="checklist">
+        <li><code class="status">[]</code> <code>python training/env/check_gpu.py</code> — Exit 0 with sm_120 listed, flash-attn OK, and matmul at or above 70 percent of the card's dense BF16 peak.</li>
+        <li><code class="status">[]</code> <code>python -c "import torch; print(torch.__version__, torch.version.cuda, torch.cuda.get_device_name())"</code> — Proves the pinned build is the one in use.</li>
+      </ul>
+      <div class="loop">
+        🔁 <strong>Do not exit this phase until every box above is checked.</strong>
+        If any command fails, fix the cause and re-run — loop until all pass.
+      </div>
+    </div>
+
+    <!-- Phase 2 -->
+    <div class="phase">
+      <h3><code class="status">[]</code> Phase 2: Measure utilization (board fields, MFU, daily busy percentage)</h3>
+      <p>You cannot fill a GPU you cannot see. Add the missing measurements to the telemetry the board already reads, and start the all-day logger.</p>
+
+      <h4>2.1. Telemetry fields</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> In <code>training/telemetry.py</code>, keep every field the board reads (<code>step</code>, <code>loss</code>, <code>lr</code>, <code>grad_norm</code>, <code>lora_B_norm</code>, <code>tok_per_s</code>, <code>tokens_seen</code>, <code>examples_seen</code>, <code>gpu_mem_gb</code>, <code>elapsed_s</code>) and add <code>gpu_util</code>, <code>power_w</code>, <code>sm_clock_mhz</code>, <code>throttle</code>, <code>mfu</code>, <code>data_wait_ms</code>.</li>
+        <li><code class="status">[]</code> Compute MFU as <code>tok_per_s * 4 * N_params / peak_flops</code>. A frozen base model does a forward pass and an activation-gradient pass, about 4N FLOPs per token. Recompute from gradient checkpointing is not counted as useful work. Peak is 209.5e12 for the 5090 and 503.8e12 for the PRO 6000, BF16 dense, unless Phase 1's microbenchmark shows a different real ceiling.</li>
+        <li><code class="status">[]</code> Read GPU counters through NVML (<code>pynvml</code>) in a background thread every 10 s. Reduce loss on the GPU and copy to CPU only at log steps.</li>
+        <li><code class="status">[]</code> Ask the board owner to add <code>gpu_util</code> and <code>mfu</code> charts. Old runs without these fields must still render.</li>
+      </ul>
+
+      <h4>2.2. All-day logger</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> <code>training/gpu_util_logger.ps1</code> runs <code>nvidia-smi --query-gpu=timestamp,utilization.gpu,memory.used,power.draw,clocks.sm,temperature.gpu,clocks_throttle_reasons.active --format=csv,noheader -l 10</code> into <code>runs/util/YYYY-MM-DD.csv</code>, registered as a Windows scheduled task at logon.</li>
+        <li><code class="status">[]</code> A daily summary gives busy percentage (samples with util above 10 percent, divided by all samples) and average MFU while busy. These go into <code>vault/training.md</code> weekly, which is the evidence Ben's buy bar asks for.</li>
+      </ul>
+
+      <h4>2.3. Testing Strategy</h4>
+      <p>Unit-test the MFU math and the JSONL schema with pytest. Then check against a known case: the Exxact benchmark ran Llama 3.1 8B LoRA on an RTX PRO 6000 at 4,962 tok/s, which this formula puts at about 31.5 percent MFU. The logger is checked by letting it run for 5 minutes during a training job.</p>
+      <ul class="checklist">
+        <li><code class="status">[]</code> <code>python -m pytest training/tests/test_telemetry.py -q</code> — MFU math, schema compatible with the board, no field removed.</li>
+        <li><code class="status">[]</code> <code>Get-Content runs/util/$(Get-Date -Format yyyy-MM-dd).csv -Tail 5</code> — Logger is writing live rows.</li>
+      </ul>
+      <div class="loop">
+        🔁 <strong>Do not exit this phase until every box above is checked.</strong>
+        If any command fails, fix the cause and re-run — loop until all pass.
+      </div>
+    </div>
+
+    <!-- Phase 3 -->
+    <div class="phase">
+      <h3><code class="status">[]</code> Phase 3: Throughput tuning, one lever at a time</h3>
+      <p>Benchmark on a public non-clinical dataset (for example a general Swahili-English instruction set with a license that allows training), 200 steps per config, same base model as the Phase 4 front-runner. Change one lever per row and keep it only if tok/s goes up and loss at step 200 holds.</p>
+      <figure>
+        <!-- {{PHASE_IMAGE: stacked bars of throughput rising as levers are added: packing, batch, fused kernels}} -->
+        <figcaption>Each lever is kept only if it raises tokens per second without hurting loss.</figcaption>
+      </figure>
+
+      <h4>3.1. The matrix (in order)</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> <strong>Baseline:</strong> BF16, padded batches, micro-batch 1, gradient checkpointing on. Record tok/s, MFU, peak memory, <code>data_wait_ms</code>.</li>
+        <li><code class="status">[]</code> <strong>Precision:</strong> BF16 base instead of 4-bit when the model fits. 4-bit dequantize costs throughput. Use QLoRA only to fit a model that would not otherwise fit.</li>
+        <li><code class="status">[]</code> <strong>Padding-free packing</strong> with FlashAttention 2. Pick <code>max_seq_length</code> from the real length histogram (around the 99th percentile), not a round number.</li>
+        <li><code class="status">[]</code> <strong>Micro-batch:</strong> double until peak memory reaches about 90 percent, then lower gradient accumulation to keep the same effective batch.</li>
+        <li><code class="status">[]</code> <strong>Gradient checkpointing:</strong> off if it fits. Otherwise use Unsloth's offloaded checkpointing, which uses system RAM. Here 96 GB of RAM does help.</li>
+        <li><code class="status">[]</code> <strong>Fused kernels:</strong> Unsloth kernels or Liger (RMSNorm, RoPE, SwiGLU, fused linear cross-entropy). Chunked cross-entropy matters most for big vocabularies: Gemma's 262k vocab at 2,048 tokens is about 2 GB of FP32 logits per sequence.</li>
+        <li><code class="status">[]</code> <strong>Input pipeline:</strong> pre-tokenize to Arrow once, use <code>pin_memory</code>, and set worker count so <code>data_wait_ms</code> is near 0. On Windows, worker processes spawn slowly, so use <code>persistent_workers=True</code>.</li>
+        <li><code class="status">[]</code> <strong>Logging:</strong> no <code>.item()</code>, <code>print</code> of tensors, or <code>torch.cuda.synchronize()</code> per step.</li>
+        <li><code class="status">[]</code> <strong>torch.compile</strong> last, and only if it is stable with PEFT on this stack.</li>
+        <li><code class="status">[]</code> <strong>Thermals:</strong> if <code>throttle</code> is non-zero for long periods, fix airflow or the power limit before changing any code.</li>
+      </ul>
+
+      <h4>3.2. Targets</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> GPU util above 95 percent during steps, <code>data_wait_ms</code> under 2 percent of step time, and MFU at or above 35 percent (stretch goal 45 percent). For a 9B model on a 5090, 35 percent MFU is about 2,000 tok/s.</li>
+        <li><code class="status">[]</code> Write the winning settings into <code>training/configs/*.yaml</code> and the table of results into <code>vault/training.md</code>.</li>
+      </ul>
+
+      <h4>3.3. Testing Strategy</h4>
+      <p>Each config is one queued job with a fixed seed. Losses at step 200 must agree within noise across levers. A lever that changes the loss curve is a bug, not a speedup (for example, packing without attention masks leaks across examples). Run each row twice and keep the median.</p>
+      <ul class="checklist">
+        <li><code class="status">[]</code> <code>python training/bench/throughput_matrix.py --model &lt;front-runner&gt; --steps 200 --repeat 2</code> — Produces the results table with tok/s, MFU, memory, and loss@200 per lever.</li>
+        <li><code class="status">[]</code> <code>python training/bench/throughput_matrix.py --check-loss-parity</code> — Fails if any kept lever moves loss@200 by more than 2 percent.</li>
+      </ul>
+      <div class="loop">
+        🔁 <strong>Do not exit this phase until every box above is checked.</strong>
+        If any command fails, fix the cause and re-run — loop until all pass.
+      </div>
+    </div>
+
+    <!-- Phase 4 -->
+    <div class="phase">
+      <h3><code class="status">[]</code> Phase 4: Keep the GPU busy all day with a job queue</h3>
+      <p>A fast run that leaves the card idle overnight still wastes money. One runner process owns the GPU and pulls jobs in priority order: training, then evaluating that adapter, then the next sweep config, then the bake-off backlog.</p>
+
+      <h4>4.1. Runner</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> <code>training/queue/runner.py</code>: watch <code>queue/jobs/</code>, run one job at a time, move it to <code>queue/done/</code> or <code>queue/failed/</code> with its log, and call <code>gate.py</code> before any job tagged <code>clinical</code>.</li>
+        <li><code class="status">[]</code> Resume from the latest checkpoint after a crash or a Windows Update reboot. Pause Windows Update during long runs and checkpoint every 30 minutes.</li>
+        <li><code class="status">[]</code> When the queue is empty, notify Evan once. Do not invent work to look busy.</li>
+      </ul>
+
+      <h4>4.2. Testing Strategy</h4>
+      <p>Test with three tiny jobs (10 steps each) and one deliberately failing job. Kill the runner in the middle of a job and confirm it resumes from the checkpoint.</p>
+      <ul class="checklist">
+        <li><code class="status">[]</code> <code>python -m pytest training/tests/test_queue.py -q</code> — Ordering, failure isolation, resume, and the gate refusing a <code>clinical</code> job.</li>
+        <li><code class="status">[]</code> Daily busy percentage from the Phase 2 logger is above 70 percent on days with queued work.</li>
+      </ul>
+      <div class="loop">
+        🔁 <strong>Do not exit this phase until every box above is checked.</strong>
+        If any command fails, fix the cause and re-run — loop until all pass.
+      </div>
+    </div>
+
+    <!-- Phase 5 -->
+    <div class="phase">
+      <h3><code class="status">[]</code> Phase 5: Untuned base-model bake-off on our own scorecards</h3>
+      <p>Pick the base model with evidence before any clinical data exists. This fills the <code>Untuned candidate</code> slot in the eval harness. It depends on the eval harness from <code>evals/BUILD-PROMPT.md</code> being built. Reports carry <code>engineering_regression_only</code>, because the gold is still synthetic.</p>
+
+      <h4>5.1. Candidates</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> Check each model card for license, real sizes, context length, and language list before the run. The Qwen 3.5 and Gemma 4 sizes come from secondary sources.</li>
+        <li><code class="status">[]</code> On 32 GB: MedGemma 1.5 4B (medical-tuned, small), Qwen 3.5 9B, Gemma 4 12B, plus <code>decide()</code> as the floor.</li>
+        <li><code class="status">[]</code> On 96 GB, add: MedGemma 27B (text), Gemma 4 31B, Qwen 3.5 27B.</li>
+      </ul>
+
+      <h4>5.2. Measures (never averaged)</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> Downgrade-against-floor count before reconciliation. It shows how often the floor has to save the model.</li>
+        <li><code class="status">[]</code> Scorecard A under-triage rate with its Clopper-Pearson upper bound, separately for <code>en</code>, <code>sw</code> and <code>codeswitch</code>. The clinical pass stays <code>blocked</code> while the ceiling is <code>unset</code>.</li>
+        <li><code class="status">[]</code> Abstain false-answer rate, JSON validity rate (with grammar-constrained decoding), danger-fact recall, and p95 latency at batch size 1 on this card.</li>
+        <li><code class="status">[]</code> Swahili quality: a native speaker rates 50 of the model's follow-up questions in Swahili for fluency and clarity. This is the one human step in this phase.</li>
+      </ul>
+
+      <h4>5.3. Testing Strategy</h4>
+      <p>Same locked rows, same prompt, same decoding settings, and temperature 0 for every candidate. Same-model self-grading is forbidden (wave1-contract). The harness compares against the frozen expected labels, not a model judge.</p>
+      <ul class="checklist">
+        <li><code class="status">[]</code> <code>python training/eval_candidate.py --model &lt;id&gt; --rows evals/manifest.json --out runs/bakeoff/&lt;id&gt;.jsonl</code> — One JSONL file per candidate, with hashes matching the manifest.</li>
+        <li><code class="status">[]</code> <code>npx vitest run tests/eval-baseline.test.ts</code> (on the Mac, focused) — Frozen baseline hash still matches, so no fixture changed.</li>
+      </ul>
+      <div class="loop">
+        🔁 <strong>Do not exit this phase until every box above is checked.</strong>
+        If any command fails, fix the cause and re-run — loop until all pass.
+      </div>
+    </div>
+
+    <!-- Phase 6 -->
+    <div class="phase">
+      <h3><code class="status">[]</code> Phase 6: Data pipeline and the gate</h3>
+      <p>Build the path clinical data will take, with the gate built into the code. Write no clinical labels. Engineering fixtures never become training rows.</p>
+
+      <h4>6.1. Schema and manifest</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> <code>training/data/schema.py</code>: <code>encounter_text</code>, <code>language</code> (<code>en</code>, <code>sw</code> or <code>codeswitch</code>), <code>facts_at_decision_time</code>, <code>Y</code> (stays <code>unset</code>), <code>source</code>, <code>data_rights_id</code>, <code>facility_id</code> and <code>time_bucket</code> (for the facility and time split), and <code>split</code> (<code>train</code> or <code>sealed_gold</code>).</li>
+        <li><code class="status">[]</code> The loader rejects rows tagged <code>SYNTHETIC</code> or <code>engineering_fixture</code>, rows without a <code>data_rights_id</code>, and any <code>sealed_gold</code> row.</li>
+        <li><code class="status">[]</code> The dataset manifest stores a SHA-256 per file. The sealed gold hash is recorded before the first weight update and checked at every eval.</li>
+        <li><code class="status">[]</code> Data lives on the box under <code>training/data/</code> (gitignored), never in this public repo.</li>
+      </ul>
+
+      <h4>6.2. The gate</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> <code>training/gate.py</code> reads <code>training/OPENING-CRITERIA.json</code> with five fields: <code>Y</code>, <code>product</code>, <code>clinician_signoff</code> (name, date, ceiling), <code>data_rights_note</code>, and <code>sealed_gold_sha256</code>. Any field that is missing or <code>unset</code> blocks the job and names the missing field.</li>
+        <li><code class="status">[]</code> The file template is committed with every field set to <code>unset</code>. Only Evan and the named clinician edit it.</li>
+      </ul>
+
+      <h4>6.3. Testing Strategy</h4>
+      <p>Pytest with synthetic rows that are correctly tagged and therefore must be rejected. Cases: a synthetic row, a row without data rights, a gold row in the train split, and a gate file with one <code>unset</code> field.</p>
+      <ul class="checklist">
+        <li><code class="status">[]</code> <code>python -m pytest training/tests/test_data_gate.py -q</code> — Every forbidden row is rejected, and the gate blocks while any field is <code>unset</code>.</li>
+        <li><code class="status">[]</code> <code>python training/gate.py --check</code> — Prints <code>blocked</code> with the five missing fields today.</li>
+      </ul>
+      <div class="loop">
+        🔁 <strong>Do not exit this phase until every box above is checked.</strong>
+        If any command fails, fix the cause and re-run — loop until all pass.
+      </div>
+    </div>
+
+    <!-- Phase 7 -->
+    <div class="phase">
+      <h3><code class="status">[]</code> Phase 7: Gated SFT, then shadow mode</h3>
+      <p>This runs only after <code>gate.py --check</code> prints <code>open</code>. It trains one LoRA adapter on the front-runner from Phase 5 and runs it in shadow mode beside <code>decide()</code>. Shadow mode changes no screen, stored decision or referral.</p>
+      <figure>
+        <!-- {{PHASE_IMAGE: locked gate opening onto a single training run, adapter flowing into shadow lane beside rules}} -->
+        <figcaption>The clinical fine-tune starts only when the gate opens, and its first deployment is shadow only.</figcaption>
+      </figure>
+
+      <h4>7.1. Recipe (starting point; tuned only on the train split)</h4>
+      <pre><code>method: LoRA (BF16 base if it fits; QLoRA 4-bit only to fit)
+targets: all linear projections (q,k,v,o,gate,up,down)
+rank: 16   alpha: 32   dropout: 0
+loss: assistant tokens only (JSON answer), prompt masked
+lr: 1e-4, cosine, warmup 3%     grad_clip: 1.0     weight_decay: 0
+effective batch: 32 sequences   epochs: 2 (stop on facility/time-held-out val)
+max_seq_length: p99 of real lengths, padding-free packing
+seeds: 3 (report the spread, not the best one)
+output: JSON constrained to the contract-six enum + danger facts + next question</code></pre>
+      <ul class="checklist">
+        <li><code class="status">[]</code> Validation split is by facility and time, never random rows (BUILD-PROMPT section 5).</li>
+        <li><code class="status">[]</code> Score every seed with both scorecards. Promotion means shadow only, and only if the downgrade-against-floor count is 0 after reconciliation and Scorecard A is within the signed ceiling in every language stratum.</li>
+        <li><code class="status">[]</code> Shadow mode logs model and floor disagreements for clinician review. Those reviews become the next round's labels.</li>
+      </ul>
+
+      <h4>7.2. Testing Strategy</h4>
+      <p>The sealed gold set is opened once per candidate, never during tuning. The gold hash is checked before scoring. A rules card that ties the model on Scorecard B means the rules are kept (BUILD-PROMPT).</p>
+      <ul class="checklist">
+        <li><code class="status">[]</code> <code>python training/gate.py --check</code> — Prints <code>open</code> before the job starts. Otherwise this phase stays <code>[]</code>.</li>
+        <li><code class="status">[]</code> <code>python training/eval_candidate.py --adapter runs/&lt;tag&gt;/adapter --rows sealed_gold --verify-hash</code> — Gold hash matches and both scorecards are written separately.</li>
+      </ul>
+      <div class="loop">
+        🔁 <strong>Do not exit this phase until every box above is checked.</strong>
+        If any command fails, fix the cause and re-run — loop until all pass.
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== GLOBAL VALIDATION ===== -->
+  <section id="validation">
+    <h2>Validation Commands</h2>
+    <p>Execute these commands to validate the entire plan is complete:</p>
+    <ul class="checklist">
+      <li><code class="status">[]</code> <code>nvidia-smi --query-gpu=name,memory.total --format=csv</code> (box) — Hardware receipt exists and matches the branch taken.</li>
+      <li><code class="status">[]</code> <code>python training/env/check_gpu.py</code> (box) — Stack sees sm_120, flash-attn works, matmul reaches at least 70 percent of peak.</li>
+      <li><code class="status">[]</code> <code>python -m pytest training/tests -q</code> (box) — Telemetry, queue and data-gate tests pass.</li>
+      <li><code class="status">[]</code> <code>python training/bench/throughput_matrix.py --report</code> (box) — Front-runner config is at or above 35 percent MFU with loss parity.</li>
+      <li><code class="status">[]</code> <code>python training/gate.py --check</code> (box) — Prints the true gate state, <code>blocked</code> with named fields until people sign.</li>
+      <li><code class="status">[]</code> <code>npx tsc --noEmit &amp;&amp; npx vitest run tests/eval-baseline.test.ts</code> (Mac) — App types clean and the frozen eval hash unchanged. This is a focused check, not the full suite.</li>
+      <li><code class="status">[]</code> <code>git status --porcelain -- training/data training/runs</code> — Empty, so no data or run output is tracked in the public repo.</li>
+    </ul>
+    <div class="loop">
+      🔁 <strong>The plan is not complete until every box is checked and every command passes. If for some reason a step is not possible to complete, mark it with [f] and move on if possible.</strong>
+    </div>
+  </section>
+
+  <!-- ===== NOTES ===== -->
+  <section id="notes">
+    <h2>Notes</h2>
+
+    <h3>N1. Model size by card (BF16 LoRA unless noted)</h3>
+    <table>
+      <tr><th>Base model</th><th>BF16 weights</th><th>32 GB (RTX 5090)</th><th>96 GB (RTX PRO 6000)</th><th>Why consider it</th></tr>
+      <tr><td>MedGemma 1.5 4B</td><td>~8 GB</td><td>BF16, roomy</td><td>BF16, roomy</td><td>Medical-tuned Gemma 3. Smallest deployable. Its paper reports fine-tuning it beats fine-tuning base Gemma when data is scarce.</td></tr>
+      <tr><td>Qwen 3.5 9B</td><td>~18 GB</td><td>BF16, fits</td><td>BF16, roomy</td><td>Broad language coverage (200+ claimed, Swahili included). Apache 2.0 reported.</td></tr>
+      <tr><td>Gemma 4 12B</td><td>~24 GB</td><td>Tight. 8-bit or QLoRA</td><td>BF16, fits</td><td>140+ pretraining languages claimed. Large vocab needs chunked CE.</td></tr>
+      <tr><td>MedGemma 27B / Gemma 4 31B / Qwen 3.5 27B</td><td>54–62 GB</td><td>QLoRA only, slow</td><td>BF16, fits (watch WSL2 overhead)</td><td>Upper bound for quality. Probably too big to serve to CHWs cheaply.</td></tr>
+    </table>
+    <p>The recommended default is the best of the 4B to 12B group in Phase 5. Data size decides this, not GPU size: with a few thousand labeled cases, a 9B adapter will usually match a 31B one on a narrow task, and it runs much cheaper in the field. The 96 GB card is better spent on faster sweeps and 3 seeds than on a bigger base model.</p>
+
+    <h3>N2. Throughput math to sanity-check the board</h3>
+    <pre><code>useful FLOPs per token (frozen base, LoRA)  ≈ 4 × N
+MFU = tok_per_s × 4 × N / peak_bf16_dense
+
+5090      peak ≈ 209.5 TFLOPS → 9B at 35% MFU ≈ 2,040 tok/s
+PRO 6000  peak ≈ 503.8 TFLOPS → 9B at 35% MFU ≈ 4,900 tok/s
+Reference: Exxact, Llama 3.1 8B LoRA, PRO 6000, HF Transformers,
+           seq 512, batch 2 → 4,962 tok/s ≈ 31.5% MFU</code></pre>
+    <p>If the board shows a much lower tok/s for the model size, look at <code>data_wait_ms</code>, padding, micro-batch 1, 4-bit dequantize, and per-step syncs, in that order.</p>
+
+    <h3>N3. Open decisions (only Evan and the clinician can close these)</h3>
+    <ul>
+      <li><strong>D1.</strong> Product: <code>household_advice</code>, <code>chp_worklist</code> or <code>both_separate</code>. This changes which scorecard gates promotion and what the model outputs (a disposition, or a rank score under capacity K).</li>
+      <li><strong>D2.</strong> Y, the label column.</li>
+      <li><strong>D3.</strong> The clinician, protocol pack and ceiling.</li>
+      <li><strong>D4.</strong> Data source and data-rights note. Being connected to eCHIS is not that note.</li>
+      <li><strong>D5.</strong> Whether training code lives in this public repo (this plan's default, with data and weights ignored by git) or in a private repo.</li>
+    </ul>
+
+    <h3>N4. Risks</h3>
+    <ul>
+      <li><strong>R1.</strong> The live run trains on unclear data. Phase 0.2 labels it <code>shakedown</code> until proven otherwise.</li>
+      <li><strong>R2.</strong> WSL2 on Blackwell hides about 16 GiB of overhead from PyTorch. Measure with <code>nvidia-smi</code>.</li>
+      <li><strong>R3.</strong> bitsandbytes 4-bit is unconfirmed on Windows sm_120. The plan prefers BF16 and treats 4-bit as optional.</li>
+      <li><strong>R4.</strong> A Kenyan LLM decision-support study (cited secondhand) reported 7.8 percent of AI recommendations as harmful. The floor-wins reconciler and shadow-first rollout exist for this reason.</li>
+      <li><strong>R5.</strong> Rental PCs reboot. Checkpoints every 30 minutes and queue resume cover it.</li>
+    </ul>
+
+    <h3>N5. Rejected approaches</h3>
+    <ul>
+      <li>From-scratch pretraining and 70B models: already rejected on 2026-09-10, and pointless with this data size.</li>
+      <li>Training on engineering fixtures, or on IMCI and ETAT numbers typed in by an agent: this fakes a clinical approval (BUILD-PROMPT section 7).</li>
+      <li>One averaged "accuracy" score: banned by the two-scorecard design.</li>
+      <li>Calling a hosted Jev model: there is no key, and the only Jev trial was a mock.</li>
+    </ul>
+
+    <h3>N6. Sources</h3>
+    <ul>
+      <li><a href="https://flopper.io/compare/nvidia-geforce-rtx-5090-32gb-vs-nvidia-rtx-pro-6000-blackwell-workstation-edition">Flopper: RTX 5090 vs RTX PRO 6000 specs</a></li>
+      <li><a href="https://www.exxactcorp.com/blog/benchmark/lora-fine-tuning-benchmark-on-nvidia-gpus">Exxact: LoRA benchmark on RTX PRO Blackwell</a></li>
+      <li><a href="https://blog.us.fixstars.com/evaluating-llm-fine-tuning-efficiency-on-nvidia-rtx-6000-blackwell-max-q/">Fixstars: Unsloth on RTX PRO 6000 Max-Q</a></li>
+      <li><a href="https://github.com/microsoft/WSL/issues/40401">microsoft/WSL#40401: 16 GiB overhead on Blackwell</a></li>
+      <li><a href="https://github.com/unslothai/unsloth/pull/6970">Unsloth PR 6970: flash-attn on Blackwell</a></li>
+      <li><a href="https://www.unsloth.ai/docs/get-started/fine-tuning-for-beginners/unsloth-requirements">Unsloth requirements (Windows, RTX 50)</a></li>
+      <li><a href="https://huggingface.co/docs/trl/main/en/reducing_memory_usage">TRL: packing, padding-free, Liger</a></li>
+      <li><a href="https://arxiv.org/html/2507.05201v4">MedGemma technical report</a></li>
+      <li><a href="https://arxiv.org/html/2411.15640">AfriMed-QA (English-only)</a></li>
+      <li><a href="https://arxiv.org/pdf/2605.23465">IyàwóBench: exam scores do not equal triage accuracy</a></li>
+      <li><a href="https://www.betterclaw.io/blog/gemma-4-vs-qwen-3-5">Gemma 4 vs Qwen 3.5 sizes (secondary, verify on model cards)</a></li>
+    </ul>
+
+    <figure>
+      <!-- {{NOTES_IMAGE: gauge pair: GPU busy percent per day and MFU per run, teal needles}} -->
+      <figcaption>Two numbers define "full GPU use": percent busy across the day, and MFU while busy.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ===== AMENDMENTS ===== -->
+  <section id="amendments">
+    <h2>Amendments</h2>
+    <details>
+      <summary>2026-10-08 — Card confirmed: RTX 5090, 32 GB GPU memory, 96 GB system RAM</summary>
+      <p>Evan confirmed the box is an RTX 5090. The 96 GB is system RAM, not GPU memory, so every phase uses the 32 GB column of N1: 4B to 12B models in BF16 LoRA, QLoRA only to fit a 12B. The 96 GB of RAM makes offloaded gradient checkpointing and large pre-tokenized datasets cheap (Phase 3). Phase 0 still records the <code>nvidia-smi</code> receipt.</p>
+    </details>
+    <details>
+      <summary>2026-10-08 — Executed by tunza-adw</summary>
+      <p>This plan is now run phase by phase by the 7-agent ADW in <code>tools/tunza-adw/</code> (scout, planner, builder, tuner, gatekeeper, reviewer, documenter), installed on the PC with one PowerShell line and driven from its red dashboard. Code, not the agents, sets the status markers in this file after a phase is accepted.</p>
+    </details>
+  </section>
+
+</main>
+</body>
+</html>

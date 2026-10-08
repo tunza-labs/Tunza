@@ -47,3 +47,18 @@ next-env.d.ts
 
 # Claude Code writes mod types on load
 /tools/*/.claude-plugin/types/
+
+# tunza-adw and model training: data, weights and run output never enter this public repo
+/.tunza-adw/
+/training/data/
+/training/runs/
+/training/adapters/
+/training/.venv/
+*.safetensors
+*.gguf
+__pycache__/
+.pytest_cache/
+# written by local Claude Code hooks, at any depth
+**/logs/*.json
+**/logs/*.jsonl
+**/.claude/data/

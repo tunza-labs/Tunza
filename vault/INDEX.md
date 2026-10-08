@@ -24,6 +24,7 @@ a wiki, not a diary.
 | [capability-map.md](capability-map.md) | 16-axis audit of the public app and the private prompt lane |
 | [wave1-contract.md](wave1-contract.md) | Wave-1 boundary, deferrals, and file ownership |
 | [wave1-handoff.md](wave1-handoff.md) | Host-recovery receipts. Not a release. |
+| [training.md](training.md) | Live training board, what a run is, how to read it, the training gate |
 | [wave2-ledger.md](wave2-ledger.md) | Deferred work and the evidence required to open it |
 | [workflows/2026-10-06-receipt.md](workflows/2026-10-06-receipt.md) | Actionable closeout for the 2026-10-06 agent-run receipt. Not a release. |
 | [tickets/medical-triage-adapter.md](tickets/medical-triage-adapter.md) | Private-lane hardening ticket. Route not edited. |
@@ -31,6 +32,13 @@ a wiki, not a diary.
 | [sessions/](sessions/) | One dated note per working session |
 
 ## Current state (update when it changes)
+
+- **2026-10-08:** `tools/tunza-adw/` runs the model build plan
+  (`specs/tunza-model-build-and-gpu-utilization.html`) with seven agents and a
+  red dashboard (workflows left, GPU memory and RAM right). Install on the PC:
+  `irm https://raw.githubusercontent.com/tunza-labs/Tunza/main/tools/tunza-adw/install.ps1 | iex`.
+  The box is an RTX 5090 (32 GB GPU memory) with 96 GB system RAM. Clinical
+  training stays behind `training/OPENING-CRITERIA.json`. See `training.md`.
 
 - **2026-10-07:** wave 1 merged to `main` (PR #8, `d3d8f84`). Five machines
   now work the repo at once through the tunza-crew mod (`tools/tunza-crew/`,
