@@ -11,6 +11,7 @@
     tunza-adw run --phase 3          run one phase
     tunza-adw run --all              run phases in order until one stops
     tunza-adw run --next --dry-run   print the steps, call no model
+    tunza-adw selftest               prove all 7 agents work on this machine (about $0.10)
     tunza-adw ui                     red dashboard: run workflows, live GPU memory and RAM
 
 Code owns the order, the gates and the verdict. Agents fill typed envelopes.
@@ -41,6 +42,9 @@ ROOT = TOOL.parents[1]
 PLAN_REL = "specs/tunza-model-build-and-gpu-utilization.html"
 RUNS_REL = ".tunza-adw/runs"
 IS_WIN = os.name == "nt"
+# The self-test runs in a throwaway repo but writes its trace here, so the dashboard shows it.
+RUNS_DIR = Path(os.environ["TUNZA_ADW_RUNS"]) if os.environ.get("TUNZA_ADW_RUNS") else ROOT / RUNS_REL
+RUN_PREFIX = os.environ.get("TUNZA_ADW_RUN_PREFIX", "")
 
 SEATS = ["scout", "planner", "builder", "tuner", "gatekeeper", "reviewer", "documenter"]
 READ_ONLY = {"scout", "gatekeeper", "reviewer"}
@@ -218,6 +222,35 @@ class SeatResult:
     data: dict
     cost: float = 0.0
     engine: str = ""
+    usage: dict = field(default_factory=dict)
+
+
+Emit = Callable[..., None]
+CLIP = 3000
+
+
+def clip(value: Any, limit: int = CLIP) -> str:
+    text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
+    return text if len(text) <= limit else text[:limit] + f" … [{len(text) - limit} more characters]"
+
+
+def agent_env() -> dict:
+    """Environment for agents and validation commands. Puts the Python that runs this tool
+    first on PATH, so `python` works on a PC whose only Python is the one uv manages."""
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
+    first = Path(sys.executable).parent
+    if not IS_WIN:  # macOS/Linux often have only python3; give commands a plain `python` too
+        shim = ROOT / ".tunza-adw" / "bin"
+        shim.mkdir(parents=True, exist_ok=True)
+        link = shim / "python"
+        if not link.exists():
+            try:
+                link.symlink_to(sys.executable)
+            except OSError:
+                pass
+        env["PATH"] = str(shim) + os.pathsep + env.get("PATH", "")
+    env["PATH"] = str(first) + os.pathsep + env["PATH"]
+    return env
 
 
 def claude_exe() -> str | None:
@@ -226,76 +259,213 @@ def claude_exe() -> str | None:
     return (shutil.which("claude.exe") if IS_WIN else None) or shutil.which("claude")
 
 
-class ClaudeRuntime:
-    """Runs a seat as a fresh, headless Claude Code session."""
+def _usage(u: dict) -> dict:
+    return {"input": int(u.get("input_tokens") or 0), "output": int(u.get("output_tokens") or 0),
+            "cache_read": int(u.get("cache_read_input_tokens") or u.get("cached_input_tokens") or 0),
+            "cache_write": int(u.get("cache_creation_input_tokens") or u.get("cache_write_input_tokens") or 0)}
 
-    def __init__(self, config: dict, run_dir: Path):
+
+class ClaudeStream:
+    """Turns Claude Code `stream-json` lines into trace events: init (model, tools),
+    tool_call, tool_result, text, usage, and the final structured output."""
+
+    def __init__(self, emit: Emit):
+        self.emit = emit
+        self.per_message: dict[str, dict] = {}
+        self.usage = _usage({})
+        self.cost = 0.0
+        self.structured: dict | None = None
+        self.result: dict | None = None
+
+    def feed(self, line: str) -> None:
+        try:
+            e = json.loads(line)
+        except json.JSONDecodeError:
+            return
+        kind = e.get("type")
+        if kind == "system" and e.get("subtype") == "init":
+            self.emit("init", model=e.get("model", ""), tools=e.get("tools") or [],
+                      mcp_servers=len(e.get("mcp_servers") or []), session_id=e.get("session_id", ""))
+        elif kind == "assistant":
+            msg = e.get("message") or {}
+            if msg.get("id") and msg.get("usage"):
+                self.per_message[msg["id"]] = _usage(msg["usage"])
+                live = {k: sum(u[k] for u in self.per_message.values()) for k in self.usage}
+                self.emit("usage", **live, cost_usd=None, final=False)
+            for block in msg.get("content") or []:
+                if block.get("type") == "tool_use":
+                    if block.get("name") == "StructuredOutput":
+                        self.structured = block.get("input")
+                        self.emit("output", data=block.get("input"))
+                    else:
+                        self.emit("tool_call", id=block.get("id", ""), name=block.get("name", ""),
+                                  input=clip(block.get("input")))
+                elif block.get("type") == "text" and block.get("text", "").strip():
+                    self.emit("text", text=clip(block["text"]))
+        elif kind == "user":
+            for block in (e.get("message") or {}).get("content") or []:
+                if not isinstance(block, dict) or block.get("type") != "tool_result":
+                    continue
+                content = block.get("content")
+                if isinstance(content, list):
+                    content = "\n".join(c.get("text", "") for c in content if isinstance(c, dict))
+                if content == "Structured output provided successfully":
+                    continue
+                self.emit("tool_result", id=block.get("tool_use_id", ""), output=clip(content or ""),
+                          is_error=bool(block.get("is_error")))
+        elif kind == "result":
+            self.result = e
+            self.cost = float(e.get("total_cost_usd") or 0)
+            self.usage = _usage(e.get("usage") or {})
+            if isinstance(e.get("structured_output"), dict):
+                self.structured = e["structured_output"]
+            self.emit("usage", **self.usage, cost_usd=self.cost, final=True, turns=e.get("num_turns"))
+
+
+class CodexStream:
+    """Turns `codex exec --json` lines into the same trace events."""
+
+    def __init__(self, emit: Emit, model: str):
+        self.emit, self.model = emit, model
+        self.usage = _usage({})
+
+    def feed(self, line: str) -> None:
+        try:
+            e = json.loads(line)
+        except json.JSONDecodeError:
+            return
+        kind = e.get("type")
+        if kind == "thread.started":
+            self.emit("init", model=self.model or "codex default", tools=["shell (read-only sandbox)"],
+                      mcp_servers=0, session_id=e.get("thread_id", ""))
+        elif kind in ("item.started", "item.completed"):
+            item = e.get("item") or {}
+            itype, iid = item.get("type"), item.get("id", "")
+            if itype == "agent_message" and kind == "item.completed":
+                self.emit("text", text=clip(item.get("text", "")))
+            elif itype == "command_execution":
+                if kind == "item.started":
+                    self.emit("tool_call", id=iid, name="shell", input=clip(item.get("command", "")))
+                else:
+                    code = item.get("exit_code")
+                    self.emit("tool_result", id=iid, output=clip(item.get("aggregated_output", "")),
+                              is_error=code not in (0, None))
+            elif itype in ("file_change", "mcp_tool_call", "web_search") and kind == "item.started":
+                name = itype if itype != "mcp_tool_call" else f"{item.get('server', '')}.{item.get('tool', '')}"
+                self.emit("tool_call", id=iid, name=name, input=clip({k: v for k, v in item.items()
+                                                                        if k not in ("id", "type")}))
+            elif itype in ("file_change", "mcp_tool_call", "web_search"):
+                self.emit("tool_result", id=iid, output=clip(item.get("status", "done")), is_error=False)
+        elif kind == "turn.completed":
+            u = e.get("usage") or {}
+            self.usage = {"input": max(0, int(u.get("input_tokens") or 0) - int(u.get("cached_input_tokens") or 0)),
+                          "output": int(u.get("output_tokens") or 0),
+                          "cache_read": int(u.get("cached_input_tokens") or 0), "cache_write": 0}
+            self.emit("usage", **self.usage, cost_usd=None, final=True, turns=1)
+
+
+def _stream(cmd: list[str], stdin_text: str, timeout_s: int, feed: Callable[[str], None]) -> tuple[int, str, bool]:
+    """Run a CLI, feed each stdout line as it arrives, kill it at the timeout."""
+    import threading
+
+    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                            text=True, encoding="utf-8", errors="replace", cwd=ROOT, env=agent_env())
+    timed_out = threading.Event()
+
+    def kill() -> None:
+        timed_out.set()
+        proc.kill()
+
+    timer = threading.Timer(timeout_s, kill)
+    err: list[str] = []
+    drain = threading.Thread(target=lambda: err.append(proc.stderr.read()), daemon=True)
+    timer.start()
+    drain.start()
+    try:
+        proc.stdin.write(stdin_text)
+        proc.stdin.close()
+        for line in proc.stdout:
+            feed(line)
+        proc.wait()
+    finally:
+        timer.cancel()
+    drain.join(timeout=5)
+    return proc.returncode, "".join(err)[-1500:], timed_out.is_set()
+
+
+class ClaudeRuntime:
+    """A seat as a fresh, isolated, headless Claude Code session: its own system prompt,
+    exactly its own tools, no MCP servers, no user hooks or plugins, streamed live."""
+
+    def __init__(self, config: dict):
         self.config = config
-        self.run_dir = run_dir
         self.exe = claude_exe()
 
-    def call(self, seat: str, prompt: str, system: str, schema: dict, budget: float) -> SeatResult:
+    def call(self, seat: str, prompt: str, system_file: Path, schema: dict, budget: float,
+             emit: Emit) -> SeatResult:
         if not self.exe:
             raise SeatError("claude CLI not found on PATH")
         conf = self.config["seats"][seat]
-        system_file = self.run_dir / f"{seat}.system.md"
-        system_file.write_text(system, encoding="utf-8")
-        cmd = [self.exe, "-p", "--output-format", "json", "--json-schema", json.dumps(schema),
-               "--model", conf["model"], "--append-system-prompt-file", str(system_file),
+        cmd = [self.exe, "-p", "--output-format", "stream-json", "--verbose",
+               "--json-schema", json.dumps(schema), "--model", conf["model"],
+               "--append-system-prompt-file", str(system_file),
+               "--tools", ",".join(conf["tools"]), "--strict-mcp-config",
+               "--setting-sources", "project", "--disable-slash-commands",
                "--dangerously-skip-permissions", "--no-session-persistence",
                "--max-budget-usd", f"{max(budget, 0.5):.2f}"]
-        if seat in READ_ONLY:
-            cmd += ["--disallowedTools", "Edit", "Write", "NotebookEdit"]
-        try:
-            proc = subprocess.run(cmd, input=prompt, capture_output=True, text=True, cwd=ROOT,
-                                  encoding="utf-8", errors="replace", timeout=conf["timeout_s"])
-        except subprocess.TimeoutExpired as exc:
-            raise SeatError(f"{seat} timed out after {conf['timeout_s']} s") from exc
-        try:
-            out = json.loads(proc.stdout)
-        except json.JSONDecodeError as exc:
-            raise SeatError(f"{seat} returned no JSON: {proc.stderr[-800:] or proc.stdout[-800:]}") from exc
-        if out.get("is_error") or not isinstance(out.get("structured_output"), dict):
-            raise SeatError(f"{seat} failed: {out.get('subtype')} {str(out.get('result'))[:800]}")
-        return SeatResult(out["structured_output"], float(out.get("total_cost_usd") or 0), "claude")
+        stream = ClaudeStream(emit)
+        code, err, timed_out = _stream(cmd, prompt, conf["timeout_s"], stream.feed)
+        if timed_out:
+            raise SeatError(f"{seat} timed out after {conf['timeout_s']} s")
+        result = stream.result or {}
+        if result.get("is_error") or stream.structured is None:
+            detail = str(result.get("result") or "")[:600] or err or f"exit {code}"
+            raise SeatError(f"{seat} returned no envelope ({result.get('subtype', 'no result')}): {detail}")
+        return SeatResult(stream.structured, stream.cost, "claude", stream.usage)
 
 
 class CodexRuntime:
-    """Runs a read-only seat on Codex so the review comes from a different model family."""
+    """A read-only seat on Codex, so the review comes from a different model family."""
 
     def __init__(self, config: dict, run_dir: Path):
         self.config = config
         self.exe = shutil.which("codex")
         self.run_dir = run_dir
 
-    def call(self, seat: str, prompt: str, system: str, schema: dict, budget: float) -> SeatResult:
+    def call(self, seat: str, prompt: str, system_file: Path, schema: dict, budget: float,
+             emit: Emit) -> SeatResult:
         conf = self.config["seats"][seat]
         schema_file = self.run_dir / f"{seat}.schema.json"
-        out_file = self.run_dir / f"{seat}.codex.json"
+        out_file = self.run_dir / f"{seat}.codex-output.json"
         schema_file.write_text(json.dumps(schema), encoding="utf-8")
-        cmd = [self.exe, "exec", "-s", "read-only", "-C", str(ROOT), "--skip-git-repo-check",
+        cmd = [self.exe, "exec", "--json", "-s", "read-only", "-C", str(ROOT), "--skip-git-repo-check",
                "--output-schema", str(schema_file), "-o", str(out_file)]
         if conf.get("codex_model"):
             cmd += ["-m", conf["codex_model"]]
         cmd.append("-")
+        stream = CodexStream(emit, conf.get("codex_model", ""))
+        system = system_file.read_text(encoding="utf-8")
+        code, err, timed_out = _stream(cmd, system + "\n\n" + prompt, conf["timeout_s"], stream.feed)
+        if timed_out:
+            raise SeatError(f"{seat} (codex) timed out")
         try:
-            proc = subprocess.run(cmd, input=system + "\n\n" + prompt, capture_output=True, text=True,
-                                  encoding="utf-8", errors="replace", timeout=conf["timeout_s"])
-        except subprocess.TimeoutExpired as exc:
-            raise SeatError(f"{seat} (codex) timed out") from exc
-        try:
-            return SeatResult(json.loads(out_file.read_text(encoding="utf-8")), 0.0, "codex")
+            data = json.loads(out_file.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
-            raise SeatError(f"{seat} (codex) gave no envelope: {proc.stderr[-800:]}") from exc
+            raise SeatError(f"{seat} (codex) gave no envelope: {err or f'exit {code}'}") from exc
+        return SeatResult(data, 0.0, "codex", stream.usage)
 
 
 class Seats:
-    """Picks the engine per seat. Reviewer prefers Codex, falls back to Claude."""
+    """Picks the engine per seat. The reviewer prefers Codex and falls back to Claude."""
 
     def __init__(self, config: dict, run_dir: Path, claude=None, codex=None):
         self.config = config
-        self.claude = claude or ClaudeRuntime(config, run_dir)
+        self.claude = claude or ClaudeRuntime(config)
         self.codex = codex if codex is not None else CodexRuntime(config, run_dir)
+
+    def system_prompt(self, seat: str) -> str:
+        return (TOOL / "seats" / "_shared.md").read_text(encoding="utf-8") + "\n\n" + \
+            (TOOL / "seats" / f"{seat}.md").read_text(encoding="utf-8")
 
     def engine_for(self, seat: str):
         want = self.config["seats"][seat].get("engine", "claude")
@@ -303,15 +473,14 @@ class Seats:
             return self.codex
         return self.claude
 
-    def call(self, seat: str, prompt: str, budget: float) -> SeatResult:
-        system = (TOOL / "seats" / "_shared.md").read_text(encoding="utf-8") + "\n\n" + \
-            (TOOL / "seats" / f"{seat}.md").read_text(encoding="utf-8")
+    def call(self, seat: str, prompt: str, budget: float, system_file: Path, emit: Emit) -> SeatResult:
         engine = self.engine_for(seat)
         try:
-            return engine.call(seat, prompt, system, SCHEMAS[seat], budget)
-        except SeatError:
+            return engine.call(seat, prompt, system_file, SCHEMAS[seat], budget, emit)
+        except SeatError as exc:
             if engine is self.codex:
-                return self.claude.call(seat, prompt, system, SCHEMAS[seat], budget)
+                emit("notice", text=f"Codex failed ({exc}); falling back to Claude")
+                return self.claude.call(seat, prompt, system_file, SCHEMAS[seat], budget, emit)
             raise
 
 
@@ -407,7 +576,7 @@ def run_command(cmd: str, shell: str, timeout_s: int) -> tuple[int, str]:
         argv = ["bash", "-lc", cmd]
     try:
         proc = subprocess.run(argv, cwd=ROOT, capture_output=True, text=True, encoding="utf-8",
-                              errors="replace", timeout=timeout_s)
+                              errors="replace", timeout=timeout_s, env=agent_env())
     except subprocess.TimeoutExpired:
         return 124, f"timed out after {timeout_s} s"
     except FileNotFoundError as exc:
@@ -431,22 +600,39 @@ class Run:
     steps: list[dict] = field(default_factory=list)
     envelopes: dict[str, Any] = field(default_factory=dict)
     exec_cmd: Callable[[str, str, int], tuple[int, str]] = run_command
+    seq: int = 0
+    current: str = ""
+    seat_counts: dict[str, int] = field(default_factory=dict)
+    totals: dict[str, int] = field(default_factory=lambda: {"input": 0, "output": 0, "cache_read": 0,
+                                                               "cache_write": 0, "tool_calls": 0})
+
+    # --- trace: one JSON line per event, read live by the dashboard
+    def emit(self, kind: str, **data) -> None:
+        self.seq += 1
+        event = {"seq": self.seq, "t": round(time.time(), 3), "step": self.current, "kind": kind, **data}
+        with open(self.run_dir / "events.jsonl", "a", encoding="utf-8") as f:
+            f.write(json.dumps(event, ensure_ascii=False) + "\n")
+        if kind == "tool_call":
+            print(f"      -> {data.get('name')}: {str(data.get('input', ''))[:100]}")
 
     # --- bookkeeping
     def log(self, name: str, owner: str, ok: bool, **detail) -> None:
         step = {"step": name, "owner": owner, "ok": ok, "at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
                 **detail}
         self.steps.append(step)
+        if owner == "code":
+            self.current = name
+            self.emit("step", name=name, ok=ok, why=str(detail.get("why", ""))[:2000])
         mark = "ok " if ok else "FAIL"
         extra = detail.get("why") or detail.get("summary") or ""
-        print(f"  [{mark}] {name:<14} {owner:<11} {str(extra)[:110]}")
+        print(f"  [{mark}] {name:<14} {owner:<11} {str(extra)[:110]}", flush=True)
         self.save()
 
     def save(self) -> None:
         (self.run_dir / "receipt.json").write_text(json.dumps({
             "run_id": self.run_id, "phase": self.phase.number, "phase_name": self.phase.name,
-            "spent_usd": round(self.spent, 4), "budget_usd": self.budget, "steps": self.steps,
-            "envelopes": self.envelopes}, indent=2), encoding="utf-8")
+            "spent_usd": round(self.spent, 4), "budget_usd": self.budget, "totals": self.totals,
+            "steps": self.steps, "envelopes": self.envelopes}, indent=2), encoding="utf-8")
 
     def finish(self, accepted: bool, why: str = "") -> int:
         self.log("finish", "code", accepted, why=why or ("accepted" if accepted else "not accepted"),
@@ -459,16 +645,54 @@ class Run:
         left = self.budget - self.spent
         if left <= 0:
             raise SeatError(f"budget ${self.budget:.2f} spent before {name}")
+        n = self.seat_counts[name] = self.seat_counts.get(name, 0) + 1
+        step = name if n == 1 else f"{name}-{n}"
+        self.current = step
+        conf = self.seats.config["seats"][name]
+        system_file = self.run_dir / f"{step}.system.md"
+        prompt_file = self.run_dir / f"{step}.prompt.md"
+        system_file.write_text(self.seats.system_prompt(name), encoding="utf-8")
+        prompt_file.write_text(prompt, encoding="utf-8")
+        engine = self.seats.engine_for(name)
+        engine_name = "codex" if engine is getattr(self.seats, "codex", None) else "claude"
+        model = (conf.get("codex_model") or "codex default") if engine_name == "codex" else conf["model"]
+        budget = min(left, conf["budget_usd"])
+        self.emit("seat_start", seat=name, engine=engine_name, model=model, tools=conf["tools"],
+                  read_only=name in READ_ONLY, system_file=system_file.name, prompt_file=prompt_file.name,
+                  budget_usd=round(budget, 2))
+        print(f"  [ .. ] {step:<14} {engine_name:<11} working ({model}, tools: {', '.join(conf['tools'])})", flush=True)
+        calls = {"n": 0}
+
+        def seat_emit(kind: str, **data) -> None:
+            if kind == "tool_call":
+                calls["n"] += 1
+            self.emit(kind, seat=name, **data)
+
+        started = time.time()
         before = fingerprint()
-        result = self.seats.call(name, prompt, min(left, self.seats.config["seats"][name]["budget_usd"]))
-        self.spent += result.cost
-        touched = [p for p in changed_between(before, fingerprint())]
-        if name in READ_ONLY and touched:
-            raise SeatError(f"read-only seat {name} changed files: {', '.join(touched[:8])}")
-        self.envelopes[name] = result.data
-        (self.run_dir / f"{name}.json").write_text(json.dumps(result.data, indent=2), encoding="utf-8")
-        self.log(name, result.engine or "agent", True, summary=result.data.get("summary", ""),
-                 cost_usd=round(result.cost, 4), touched=touched)
+        try:
+            result = self.seats.call(name, prompt, budget, system_file, seat_emit)
+            self.spent += result.cost
+            touched = changed_between(before, fingerprint())
+            if name in READ_ONLY and touched:
+                raise SeatError(f"read-only seat {name} changed files: {', '.join(touched[:8])}")
+        except SeatError as exc:
+            self.emit("seat_end", seat=name, ok=False, error=str(exc)[:2000],
+                      duration_s=round(time.time() - started, 1), tool_calls=calls["n"])
+            raise
+        usage = {k: int(result.usage.get(k, 0)) for k in ("input", "output", "cache_read", "cache_write")}
+        for k, v in usage.items():
+            self.totals[k] += v
+        self.totals["tool_calls"] += calls["n"]
+        engine_used = result.engine or engine_name
+        stats = {"engine": engine_used, "model": model if engine_used == engine_name else conf["model"], "tokens": usage,
+                 "tool_calls": calls["n"], "duration_s": round(time.time() - started, 1),
+                 "cost_usd": round(result.cost, 4)}
+        self.emit("seat_end", seat=name, ok=True, **stats)
+        self.envelopes[step] = result.data
+        (self.run_dir / f"{step}.json").write_text(json.dumps(result.data, indent=2), encoding="utf-8")
+        self.log(step, stats["engine"], True, summary=result.data.get("summary", ""), touched=touched,
+                 system_file=system_file.name, prompt_file=prompt_file.name, **stats)
         result.data["_touched"] = touched
         return result.data
 
@@ -476,7 +700,10 @@ class Run:
         p = self.phase
         items = "\n".join(f"  [{i}] {t}" for i, t in enumerate(p.items))
         vals = "\n".join(f"  [{i}] {v}" for i, v in zip(p.validation_items, p.validations))
-        return (f"REPO: {ROOT}\nPLAN: {ROOT / PLAN_REL}\nRUN DIR (write scratch files here): {self.run_dir}\n"
+        selftest = ("SELF-TEST RUN: this is a throwaway repo that only proves the workflow works. Stay inside "
+                    "REPO, do not search the home folder or look for the live training run, and finish in a "
+                    "few tool calls.\n\n") if RUN_PREFIX.startswith("selftest") else ""
+        return (selftest + f"REPO: {ROOT}\nPLAN: {ROOT / PLAN_REL}\nRUN DIR (write scratch files here): {self.run_dir}\n"
                 f"OS: {'Windows (PowerShell)' if IS_WIN else sys.platform}\n"
                 f"GPU RECEIPT (from code): {json.dumps(self.envelopes.get('gpu', {}))}\n"
                 f"GATE (from code): {json.dumps(self.envelopes.get('gate', {}))}\n\n"
@@ -500,11 +727,17 @@ class Run:
 
     def quality(self, plan: dict) -> dict:
         results = []
+        self.current = f"test_{len([s for s in self.steps if s['step'].startswith('test')]) + 1}"
         for v in plan["validations"]:
             if v["manual"]:
                 results.append({"cmd": v["cmd"], "covers": v["covers"], "status": "manual", "output": ""})
+                self.emit("command_end", cmd=v["cmd"], exit_code=None, status="manual", output="needs a person")
                 continue
+            self.emit("command_start", cmd=v["cmd"], shell=v["shell"])
+            started = time.time()
             code, out = self.exec_cmd(v["cmd"], v["shell"], max(60, v["timeout_s"]))
+            self.emit("command_end", cmd=v["cmd"], exit_code=code, status="pass" if code == 0 else "fail",
+                      output=clip(out), duration_s=round(time.time() - started, 1))
             results.append({"cmd": v["cmd"], "covers": v["covers"], "exit_code": code,
                             "status": "pass" if code == 0 else "fail", "output": out})
         passed = all(r["status"] != "fail" for r in results)
@@ -804,21 +1037,63 @@ class _ActiveRun:
     since: float = 0.0
 
 
-def _latest_receipt(since: float) -> dict | None:
-    runs = ROOT / RUNS_REL
-    receipts = sorted(runs.glob("*/receipt.json"), key=lambda p: p.stat().st_mtime) if runs.is_dir() else []
-    if not receipts or receipts[-1].stat().st_mtime < since:
-        return None
+RUN_NAME = re.compile(r"^[A-Za-z0-9_-]{1,80}$")
+RUN_FILE = re.compile(r"^[A-Za-z0-9_.-]{1,120}\.(md|json)$")
+
+
+def list_runs(limit: int = 25) -> list[dict]:
+    if not RUNS_DIR.is_dir():
+        return []
+    dirs = sorted((d for d in RUNS_DIR.iterdir() if d.is_dir() and RUN_NAME.match(d.name)),
+                  key=lambda d: d.stat().st_mtime, reverse=True)[:limit]
+    runs = []
+    for d in dirs:
+        info = {"name": d.name, "mtime": d.stat().st_mtime}
+        try:
+            r = json.loads((d / "receipt.json").read_text(encoding="utf-8"))
+            last = r["steps"][-1] if r.get("steps") else {}
+            info.update(phase=r.get("phase"), phase_name=r.get("phase_name"), spent_usd=r.get("spent_usd"),
+                        done=last.get("step") == "finish", accepted=last.get("ok") if last.get("step") == "finish" else None)
+        except (OSError, json.JSONDecodeError, KeyError, IndexError):
+            pass
+        runs.append(info)
+    return runs
+
+
+def read_trace(run: str, since: int) -> dict:
+    d = RUNS_DIR / run
+    if not RUN_NAME.match(run) or not d.is_dir():
+        return {"error": "no such run"}
+    events = []
+    path = d / "events.jsonl"
+    if path.exists():
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+            try:
+                e = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if e.get("seq", 0) > since:
+                events.append(e)
     try:
-        return json.loads(receipts[-1].read_text(encoding="utf-8"))
+        receipt = json.loads((d / "receipt.json").read_text(encoding="utf-8"))
+        receipt.pop("envelopes", None)
     except (OSError, json.JSONDecodeError):
+        receipt = None
+    return {"run": run, "events": events[:4000], "receipt": receipt}
+
+
+def read_run_file(run: str, name: str) -> str | None:
+    if not RUN_NAME.match(run) or not RUN_FILE.match(name):
         return None
+    path = RUNS_DIR / run / name
+    return path.read_text(encoding="utf-8", errors="replace") if path.is_file() else None
 
 
 def cmd_ui(args) -> int:
     import threading
     import webbrowser
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from urllib.parse import parse_qs, urlparse
 
     active = _ActiveRun()
     lock = threading.Lock()
@@ -834,8 +1109,7 @@ def cmd_ui(args) -> int:
             if active.log_path and active.log_path.exists():
                 tail = active.log_path.read_text(encoding="utf-8", errors="replace")[-12000:]
             return {"active": running, "cmd": active.cmd, "started": active.started,
-                    "exit_code": active.exit_code, "log_tail": tail,
-                    "receipt": _latest_receipt(active.since) if active.since else None}
+                    "exit_code": active.exit_code, "log_tail": tail, "since": active.since}
 
     def start(body: dict) -> tuple[int, dict]:
         with lock:
@@ -843,7 +1117,9 @@ def cmd_ui(args) -> int:
                 return 409, {"error": "a workflow is already running"}
             mode = body.get("mode")
             argv = [sys.executable, str(Path(__file__).resolve()), "run"]
-            if mode == "next":
+            if mode == "selftest":
+                argv[2] = "selftest"
+            elif mode == "next":
                 argv.append("--next")
             elif mode == "all":
                 argv.append("--all")
@@ -851,9 +1127,9 @@ def cmd_ui(args) -> int:
                 argv += ["--phase", str(body["phase"])]
             else:
                 return 400, {"error": "mode must be next, all or phase"}
-            if body.get("dry_run"):
+            if body.get("dry_run") and mode != "selftest":
                 argv.append("--dry-run")
-            if body.get("push"):
+            if body.get("push") and mode != "selftest":
                 argv.append("--push")
             stamp = time.strftime("%Y%m%d-%H%M%S")
             active.log_path = log_dir / f"run-{stamp}.log"
@@ -905,6 +1181,17 @@ def cmd_ui(args) -> int:
                 gpu, procs = gpu_metrics(), gpu_procs()
                 return self.send(200, {"gpu": gpu, "procs": procs, "ram": system_ram(),
                                        "advice": memory_advice(gpu, procs), "t": time.time()})
+            url = urlparse(self.path)
+            q = {k: v[0] for k, v in parse_qs(url.query).items()}
+            if url.path == "/api/runs":
+                return self.send(200, {"runs": list_runs()})
+            if url.path == "/api/trace":
+                return self.send(200, read_trace(q.get("run", ""), int(q.get("since", "0") or 0)))
+            if url.path == "/api/file":
+                text = read_run_file(q.get("run", ""), q.get("name", ""))
+                return self.send(200 if text is not None else 404,
+                                 (text if text is not None else "not found").encode("utf-8"),
+                                 "text/plain; charset=utf-8")
             if self.path == "/api/state":
                 try:
                     phases = [{"number": p.number, "name": p.name, "status": p.status, "gpu": p.needs_gpu,
@@ -948,6 +1235,93 @@ def cmd_ui(args) -> int:
     except KeyboardInterrupt:
         pass
     return 0
+
+
+
+# ----------------------------------------------------------------------------- self-test
+
+SELFTEST_PLAN = """<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>Plan: tunza-adw self-test</title></head><body><main>
+<section id="phases">
+<div class="phase">
+  <h3><code class="status">[]</code> Phase 0: Self-test greeting module{gpu_title}</h3>
+  <p>A tiny phase that proves the seven seats, the checks and the commit work on this machine.
+  Create <code>greet.py</code> at the repo root with a function <code>hi()</code> that returns the string "hi".{gpu_text}
+  Keep it small: this is a wiring test, not real work.</p>
+  <h4>0.1. Build</h4>
+  <ul class="checklist">
+    <li><code class="status">[]</code> Write greet.py with hi() returning "hi".</li>
+  </ul>
+  <h4>0.2. Testing Strategy</h4>
+  <ul class="checklist">
+    <li><code class="status">[]</code> <code>python -c "import greet; assert greet.hi() == 'hi'"</code> — hi() returns hi.</li>{gpu_check}
+  </ul>
+</div>
+</section>
+<section id="amendments"><h2>Amendments</h2></section>
+</main></body></html>
+"""
+
+
+def cmd_selftest(args) -> int:
+    import tempfile
+
+    work = Path(tempfile.mkdtemp(prefix="tunza-adw-selftest-")) / "repo"
+    tool = work / "tools" / "tunza-adw"
+    tool.mkdir(parents=True)
+    for name in ("adw.py", "ui.html"):
+        shutil.copy(TOOL / name, tool / name)
+    shutil.copytree(TOOL / "seats", tool / "seats")
+    config = load_config()
+    config["phase_budget_usd"] = 6
+    for conf in config["seats"].values():
+        conf["model"], conf["budget_usd"] = args.model, 1.0
+    (tool / "config.json").write_text(json.dumps(config, indent=2), encoding="utf-8")
+    gpu = gpu_receipt().get("available")
+    plan = SELFTEST_PLAN.format(
+        gpu_title=" and GPU check" if gpu else "",
+        gpu_text=(" Also confirm the GPU is visible. The tuner only reads current GPU memory from nvidia-smi;"
+                  " it runs no benchmark and edits nothing, and its verdict is pass when nvidia-smi works.")
+        if gpu else "",
+        gpu_check=('\n    <li><code class="status">[]</code> <code>nvidia-smi --query-gpu=name,memory.total '
+                   '--format=csv,noheader</code> — the GPU is visible.</li>') if gpu else "")
+    (work / "specs").mkdir()
+    (work / PLAN_REL).write_text(plan, encoding="utf-8")
+    (work / "vault" / "sessions").mkdir(parents=True)
+    (work / "vault" / "training.md").write_text("# Training (self-test)\n", encoding="utf-8")
+    (work / "vault" / "sessions" / "README.md").write_text("Session notes.\n", encoding="utf-8")
+    if (ROOT / ".gitignore").is_file():
+        shutil.copy(ROOT / ".gitignore", work / ".gitignore")
+    for cmd in (["init", "-q", "-b", "main"], ["config", "user.email", "selftest@tunza.local"],
+                ["config", "user.name", "tunza-adw self-test"], ["add", "-A"], ["commit", "-qm", "self-test repo"]):
+        subprocess.run(["git", *cmd], cwd=work, check=True, capture_output=True)
+
+    print(f"tunza-adw self-test · model {args.model} · GPU {'yes' if gpu else 'no'} · throwaway repo {work}", flush=True)
+    print("Watch it live in the dashboard (Tunza ADW icon): the run is named selftest-...\n", flush=True)
+    env = dict(os.environ, TUNZA_ADW_RUNS=str(RUNS_DIR), TUNZA_ADW_RUN_PREFIX="selftest-",
+               PYTHONIOENCODING="utf-8", PYTHONUNBUFFERED="1")
+    code = subprocess.call([sys.executable, str(tool / "adw.py"), "run", "--next"], cwd=work, env=env)
+
+    runs = [r for r in list_runs() if r["name"].startswith("selftest-")]
+    receipt = json.loads((RUNS_DIR / runs[0]["name"] / "receipt.json").read_text(encoding="utf-8")) if runs else {}
+    seats_seen = {st["step"].split("-")[0]: st for st in receipt.get("steps", []) if st.get("owner") != "code"}
+    expected = [s for s in SEATS if gpu or s != "tuner"]
+    print("\nseat         engine  model            tokens in/out      tools  cost")
+    for name in expected:
+        st = seats_seen.get(name)
+        if st:
+            t = st.get("tokens", {})
+            print(f"{name:<12} {st.get('engine', ''):<7} {st.get('model', ''):<16} "
+                  f"{t.get('input', 0) + t.get('cache_read', 0) + t.get('cache_write', 0):>8}/{t.get('output', 0):<8} "
+                  f"{st.get('tool_calls', 0):>5}  ${st.get('cost_usd', 0):.3f}")
+        else:
+            print(f"{name:<12} did not run")
+    missing = [s for s in expected if s not in seats_seen]
+    passed = code == 0 and not missing
+    print(f"\nSELF-TEST {'PASSED' if passed else 'FAILED'}"
+          + ("" if passed else f": {'missing seats ' + ', '.join(missing) if missing else 'see the log above'}")
+          + f" · ${receipt.get('spent_usd', 0):.2f}")
+    return 0 if passed else 1
 
 
 # ----------------------------------------------------------------------------- CLI
@@ -1053,7 +1427,7 @@ def cmd_run(args) -> int:
         print(f"branch: {ensure_branch(run_id, queue[0])}")
     code = 0
     for phase in queue:
-        run_dir = ROOT / RUNS_REL / f"{run_id}-p{phase.number}"
+        run_dir = RUNS_DIR / f"{RUN_PREFIX}{run_id}-p{phase.number}"
         run_dir.mkdir(parents=True, exist_ok=True)
         run = Run(phase=phase, run_id=run_id, run_dir=run_dir, seats=Seats(config, run_dir),
                   budget=args.budget or config["phase_budget_usd"], dry_run=args.dry_run, push=args.push)
@@ -1081,6 +1455,9 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--allow-dirty", action="store_true")
     run.add_argument("--run-id", default=None)
     run.set_defaults(fn=cmd_run)
+    st = sub.add_parser("selftest", help="prove the 7 seats work on this machine (tiny toy phase, about $0.10)")
+    st.add_argument("--model", default="haiku")
+    st.set_defaults(fn=cmd_selftest)
     ui = sub.add_parser("ui", help="open the red dashboard: run workflows, watch GPU and RAM")
     ui.add_argument("--port", type=int, default=8787)
     ui.add_argument("--no-open", action="store_true")

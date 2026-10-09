@@ -7,8 +7,8 @@
 <style>
 :root {
   --brand-deep: #4a1210; --action: #7c1f18; --urgent: #ff6b5e; --paper: #f4efe6;
-  --paper-soft: #e6d6c8; --muted: #d4b5aa; --card: rgba(30, 6, 5, .38); --line: rgba(244, 239, 230, .18);
-  --fill: #f4efe6; --band: rgba(244, 239, 230, .16); --amber: #f2b45a;
+  --paper-soft: #e6d6c8; --muted: #d4b5aa; --card: rgba(30, 6, 5, .40); --card-2: rgba(0, 0, 0, .26);
+  --line: rgba(244, 239, 230, .17); --fill: #f4efe6; --band: rgba(244, 239, 230, .16); --amber: #f2b45a;
   --mono: ui-monospace, "Cascadia Mono", Consolas, "SF Mono", monospace;
 }
 * { box-sizing: border-box; }
@@ -18,228 +18,376 @@ body {
   background: radial-gradient(120% 90% at 0% 0%, var(--action) 0%, var(--brand-deep) 70%) fixed, var(--brand-deep);
   font: 14px/1.5 "InterVariable", Inter, "Segoe UI", system-ui, sans-serif;
 }
-header { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; justify-content: space-between;
-  padding: 18px 24px 0; max-width: 1400px; margin: 0 auto; }
-h1 { font-size: 22px; margin: 0; font-weight: 650; letter-spacing: -.01em; }
-.sub { color: var(--muted); font-size: 13px; }
-main { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; padding: 16px 24px 32px;
-  max-width: 1400px; margin: 0 auto; }
-@media (max-width: 900px) { main { grid-template-columns: 1fr; padding: 12px 16px 24px; } header { padding: 14px 16px 0; } }
-.panel { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
-h2 { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
-.col { display: grid; gap: 16px; align-content: start; min-width: 0; }
-button { font: inherit; font-weight: 600; color: var(--brand-deep); background: var(--paper); border: 0; border-radius: 6px;
-  padding: 8px 14px; cursor: pointer; }
+button { font: inherit; font-weight: 600; color: var(--brand-deep); background: var(--paper); border: 0; border-radius: 6px; padding: 7px 12px; cursor: pointer; }
 button.ghost { background: transparent; color: var(--paper); border: 1px solid var(--line); }
+button.small { padding: 3px 9px; font-size: 12px; }
+button.on { background: var(--paper); color: var(--brand-deep); }
 button:disabled { opacity: .45; cursor: not-allowed; }
-select { font: inherit; color: var(--paper); background: rgba(0,0,0,.25); border: 1px solid var(--line); border-radius: 6px; padding: 7px 8px; }
+select { font: inherit; color: var(--paper); background: var(--card-2); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; max-width: 100%; }
+select option { color: #1c1916; }
 label.chk { display: inline-flex; gap: 6px; align-items: center; color: var(--paper-soft); font-size: 13px; }
-.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.phases { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.phases li { display: grid; grid-template-columns: 46px 1fr auto; gap: 10px; align-items: center; padding: 8px 10px;
-  border: 1px solid var(--line); border-radius: 6px; }
-.mark { font-family: var(--mono); font-weight: 700; text-align: center; }
-.mark.x { color: var(--paper); } .mark.f { color: var(--urgent); } .mark.wip { color: var(--amber); } .mark.idle { color: var(--muted); }
-.tag { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 6px; white-space: nowrap; }
-.seats { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 8px; }
-.seat { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
-.seat .n { font-size: 11px; color: var(--muted); }
-.seat .s { font-weight: 600; }
-.seat.ok { border-color: rgba(244,239,230,.55); } .seat.fail { border-color: var(--urgent); } .seat.live { border-color: var(--amber); }
-pre.log { margin: 0; max-height: 300px; overflow: auto; font: 12px/1.45 var(--mono); color: var(--paper-soft);
-  background: rgba(0,0,0,.28); border-radius: 6px; padding: 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
-.big { font-size: 40px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
-.unit { font-size: 15px; color: var(--muted); font-weight: 500; }
-.meter { position: relative; height: 22px; background: rgba(0,0,0,.3); border-radius: 5px; overflow: hidden; margin: 10px 0 4px; }
+
+header { display: grid; grid-template-columns: auto 1fr; gap: 10px 20px; align-items: center; padding: 14px 20px 0; max-width: 1800px; margin: 0 auto; }
+h1 { font-size: 21px; margin: 0; font-weight: 650; letter-spacing: -.01em; white-space: nowrap; }
+.totals { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.chip { background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.chip b { font-weight: 650; }
+.sub { color: var(--muted); font-size: 12.5px; }
+
+main { display: grid; grid-template-columns: 320px minmax(0, 1fr) 340px; gap: 14px; padding: 14px 20px 28px; max-width: 1800px; margin: 0 auto; align-items: start; }
+@media (max-width: 1320px) { main { grid-template-columns: 300px minmax(0, 1fr); } .right { grid-column: 1 / -1; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); } }
+@media (max-width: 860px) { main { grid-template-columns: 1fr; padding: 10px 16px 24px; } header { grid-template-columns: 1fr; padding: 12px 16px 0; } .totals { justify-content: flex-start; } }
+.col { display: grid; gap: 14px; min-width: 0; }
+.panel { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px; min-width: 0; }
+h2 { font-size: 11.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.step { display: grid; grid-template-columns: 14px 1fr auto; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 6px; border: 1px solid transparent; cursor: pointer; }
+.step:hover { border-color: var(--line); }
+.step.sel { border-color: var(--paper); background: var(--card-2); }
+.step .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
+.step.ok .dot { background: var(--paper); } .step.fail .dot { background: var(--urgent); }
+.step.live .dot { background: var(--amber); animation: pulse 1s infinite alternate; }
+@keyframes pulse { from { opacity: 1; } to { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .step.live .dot { animation: none; } }
+.step .nm { font-weight: 600; } .step .nm small { font-weight: 400; color: var(--muted); margin-left: 4px; }
+.step .meta { font-size: 11.5px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; }
+.step.code .nm { font-weight: 500; color: var(--paper-soft); }
+
+.agent-head { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: baseline; margin-bottom: 8px; }
+.agent-head .title { font-size: 20px; font-weight: 700; }
+.tools { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0 10px; }
+.tool { font: 12px var(--mono); border: 1px solid var(--line); border-radius: 4px; padding: 1px 7px; color: var(--paper-soft); }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); gap: 8px; }
+.tile { border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; min-width: 0; }
+.tile .k { font-size: 11px; color: var(--muted); } .tile .v { font-size: 17px; font-weight: 650; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+pre.doc { margin: 8px 0 0; max-height: 360px; overflow: auto; font: 12px/1.5 var(--mono); color: var(--paper-soft); background: var(--card-2); border-radius: 6px; padding: 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.feed { display: grid; gap: 6px; max-height: 64vh; overflow: auto; padding-right: 4px; }
+.ev { border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; background: var(--card-2); min-width: 0; }
+.ev .h { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.ev .badge { font: 600 11px var(--mono); padding: 1px 7px; border-radius: 4px; background: var(--paper); color: var(--brand-deep); }
+.ev.text .badge { background: transparent; color: var(--paper); border: 1px solid var(--line); }
+.ev.err { border-color: var(--urgent); } .ev.err .badge { background: var(--urgent); color: #1c0505; }
+.ev .t { font-size: 11px; color: var(--muted); margin-left: auto; font-variant-numeric: tabular-nums; }
+.ev pre { margin: 6px 0 0; font: 12px/1.45 var(--mono); color: var(--paper-soft); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 220px; overflow: auto; }
+.ev .out { border-top: 1px dashed var(--line); margin-top: 6px; padding-top: 4px; }
+.ev p { margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.empty { color: var(--muted); padding: 10px 2px; }
+
+.big { font-size: 34px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.unit { font-size: 14px; color: var(--muted); font-weight: 500; }
+.meter { position: relative; height: 20px; background: rgba(0,0,0,.3); border-radius: 5px; overflow: hidden; margin: 10px 0 4px; }
 .meter > i { position: absolute; inset: 0 auto 0 0; background: var(--fill); width: 0; transition: width .6s ease; }
-.meter > b { position: absolute; top: 0; bottom: 0; background: var(--band); border-left: 1px dashed var(--paper); border-right: 1px dashed var(--paper); }
+.meter > b { position: absolute; top: 0; bottom: 0; left: 85%; width: 7%; background: var(--band); border-left: 1px dashed var(--paper); border-right: 1px dashed var(--paper); }
 .meter.hot > i { background: var(--urgent); }
-.scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin-top: 12px; }
-.tile { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
-.tile .k { font-size: 11px; color: var(--muted); } .tile .v { font-size: 18px; font-weight: 650; font-variant-numeric: tabular-nums; }
-.advice { border-left: 4px solid var(--paper); padding: 10px 12px; background: rgba(0,0,0,.22); border-radius: 0 6px 6px 0; font-weight: 600; }
+.scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
+.advice { border-left: 4px solid var(--paper); padding: 8px 10px; background: var(--card-2); border-radius: 0 6px 6px 0; font-weight: 600; margin-top: 10px; }
 .advice.danger { border-color: var(--urgent); } .advice.headroom { border-color: var(--amber); } .advice.idle { border-color: var(--muted); }
-canvas { width: 100%; height: 150px; display: block; }
-table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
-td, th { text-align: left; padding: 4px 6px; border-top: 1px solid var(--line); } th { color: var(--muted); font-weight: 500; }
-.err { color: var(--amber); }
+canvas { width: 100%; height: 120px; display: block; }
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+td, th { text-align: left; padding: 3px 5px; border-top: 1px solid var(--line); } th { color: var(--muted); font-weight: 500; }
+.phases { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; font-size: 13px; }
+.phases li { display: grid; grid-template-columns: 38px 1fr; gap: 6px; }
+.mk { font-family: var(--mono); font-weight: 700; } .mk.f { color: var(--urgent); } .mk.wip { color: var(--amber); }
+details summary { cursor: pointer; color: var(--muted); font-size: 12.5px; }
+pre.log { margin: 8px 0 0; max-height: 260px; overflow: auto; font: 11.5px/1.45 var(--mono); color: var(--paper-soft); background: var(--card-2); border-radius: 6px; padding: 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.err-line { color: var(--amber); }
 </style>
 </head>
 <body>
 <header>
-  <div><h1>Tunza ADW</h1><div class="sub">7-agent workflow for the model build plan · RTX 5090 · runs on this machine only</div></div>
-  <div class="sub" id="gate">gate: …</div>
+  <div>
+    <h1>Tunza ADW</h1>
+    <div class="sub" id="gate">7 agents · model build plan · RTX 5090</div>
+  </div>
+  <div class="totals" id="totals"></div>
 </header>
 <main>
-  <section class="col" aria-label="Workflows">
+  <section class="col" aria-label="Run and steps">
     <div class="panel">
       <h2>Run</h2>
       <div class="row">
-        <button id="b-next">Run next phase</button>
+        <button id="b-self" title="Tiny toy phase through all 7 agents, about $0.10">Self-test</button>
+        <button id="b-next" class="ghost">Run next phase</button>
+      </div>
+      <div class="row" style="margin-top:6px">
         <select id="phase-pick" aria-label="Phase"></select>
-        <button id="b-phase" class="ghost">Run this phase</button>
+        <button id="b-phase" class="ghost">Run phase</button>
         <button id="b-all" class="ghost">Run all</button>
         <button id="b-stop" class="ghost" disabled>Stop</button>
       </div>
-      <div class="row" style="margin-top:10px">
-        <label class="chk"><input type="checkbox" id="dry"> Dry run (no model calls)</label>
-        <label class="chk"><input type="checkbox" id="push"> Push branch when accepted</label>
+      <div class="row" style="margin-top:8px">
+        <label class="chk"><input type="checkbox" id="dry"> Dry run</label>
+        <label class="chk"><input type="checkbox" id="push"> Push when accepted</label>
       </div>
-      <div class="sub" id="run-state" style="margin-top:8px">idle</div>
+      <div class="sub" id="run-state" style="margin-top:6px">idle</div>
     </div>
     <div class="panel">
-      <h2>Agents</h2>
-      <div class="seats" id="seats"></div>
+      <h2><span>Step by step</span><select id="run-pick" aria-label="Run"></select></h2>
+      <ul class="steps" id="steps"><li class="empty">No run yet. Press Self-test.</li></ul>
     </div>
     <div class="panel">
       <h2>Plan phases</h2>
       <ul class="phases" id="phases"></ul>
     </div>
+  </section>
+
+  <section class="col" aria-label="Agent detail">
+    <div class="panel" id="agent">
+      <div class="empty">Pick a step on the left. The running agent is followed automatically.</div>
+    </div>
     <div class="panel">
-      <h2>Live log</h2>
-      <pre class="log" id="log">no run yet</pre>
+      <details><summary>Console log</summary><pre class="log" id="log">no run yet</pre></details>
     </div>
   </section>
 
-  <section class="col" aria-label="Model memory">
+  <section class="col right" aria-label="Model memory">
     <div class="panel">
       <h2>GPU memory · the model</h2>
       <div class="big" id="vram">–<span class="unit"> / – GB</span></div>
-      <div class="meter" id="vram-meter"><b id="vram-band"></b><i id="vram-fill"></i></div>
+      <div class="meter" id="vram-meter"><b></b><i id="vram-fill"></i></div>
       <div class="scale"><span>0</span><span>target 85–92%</span><span id="vram-max">–</span></div>
-      <div class="advice" id="advice" style="margin-top:12px">waiting for nvidia-smi…</div>
-      <div class="tiles">
+      <div class="advice" id="advice">waiting for nvidia-smi…</div>
+      <div class="tiles" style="margin-top:10px">
         <div class="tile"><div class="k">GPU busy</div><div class="v" id="util">–</div></div>
         <div class="tile"><div class="k">Power</div><div class="v" id="power">–</div></div>
         <div class="tile"><div class="k">SM clock</div><div class="v" id="clock">–</div></div>
         <div class="tile"><div class="k">Temp</div><div class="v" id="temp">–</div></div>
-        <div class="tile"><div class="k">Throttle</div><div class="v" id="throttle">–</div></div>
       </div>
     </div>
     <div class="panel">
       <h2>System RAM</h2>
       <div class="big" id="ram">–<span class="unit"> / – GB</span></div>
       <div class="meter"><i id="ram-fill"></i></div>
-      <div class="sub">Used for data loading and offloaded checkpoints. It does not add GPU memory.</div>
+      <div class="sub">Data loading and offloaded checkpoints. Not GPU memory.</div>
     </div>
     <div class="panel">
       <h2>Last 10 minutes</h2>
       <canvas id="hist" aria-label="GPU memory, GPU busy and RAM over time"></canvas>
-      <div class="sub">solid: GPU memory % · dashed: GPU busy % · dotted: RAM %</div>
+      <div class="sub">solid GPU memory · dashed GPU busy · dotted RAM</div>
     </div>
     <div class="panel">
-      <h2>Processes on the GPU</h2>
-      <table><thead><tr><th>pid</th><th>process</th><th>GPU memory</th></tr></thead><tbody id="procs"><tr><td colspan="3">–</td></tr></tbody></table>
+      <h2>On the GPU</h2>
+      <table><thead><tr><th>pid</th><th>process</th><th>memory</th></tr></thead><tbody id="procs"><tr><td colspan="3">–</td></tr></tbody></table>
     </div>
   </section>
 </main>
 <script>
 (function () {
-  var SEATS = ["scout", "planner", "builder", "tuner", "gatekeeper", "reviewer", "documenter"];
-  var hist = [], $ = function (id) { return document.getElementById(id); };
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var hist = [];
+  var trace = { run: "", seq: 0, events: [], receipt: null };
+  var ui = { pinnedRun: "", selected: "", follow: true, view: "", viewText: "" };
+
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); }
   function gb(mib) { return mib == null ? "–" : (mib / 1024).toFixed(1); }
   function n(v, unit) { return v == null ? "–" : Math.round(v) + (unit || ""); }
+  function k(v) { v = v || 0; return v >= 1e6 ? (v / 1e6).toFixed(2) + "M" : v >= 1e3 ? (v / 1e3).toFixed(1) + "k" : String(v); }
+  function usd(v) { return v == null ? "–" : "$" + Number(v).toFixed(v < 1 ? 3 : 2); }
+  function dur(s) { if (s == null || isNaN(s)) return ""; s = Math.max(0, Math.round(s)); return s >= 60 ? Math.floor(s / 60) + "m" + String(s % 60).padStart(2, "0") + "s" : s + "s"; }
+  function clock(t) { return new Date(t * 1000).toLocaleTimeString([], { hour12: false }); }
+  function tin(t) { return t ? (t.input || 0) + (t.cache_read || 0) + (t.cache_write || 0) : 0; }
+  async function getJSON(url, opts) { var r = await fetch(url, opts); var txt = await r.text(); var j; try { j = JSON.parse(txt); } catch (e) { throw new Error(txt.slice(0, 200)); } if (!r.ok) throw new Error(j.error || txt); return j; }
 
-  async function getJSON(url, opts) { var r = await fetch(url, opts); if (!r.ok) throw new Error(await r.text()); return r.json(); }
-
-  async function metrics() {
-    try {
-      var m = await getJSON("/api/metrics"), g = m.gpu || {};
-      if (g.available) {
-        var pct = 100 * g.mem_used_mib / g.mem_total_mib;
-        $("vram").innerHTML = gb(g.mem_used_mib) + '<span class="unit"> / ' + gb(g.mem_total_mib) + " GB · " + pct.toFixed(0) + "%</span>";
-        $("vram-fill").style.width = pct.toFixed(1) + "%";
-        $("vram-meter").classList.toggle("hot", pct > 95);
-        $("vram-band").style.left = "85%"; $("vram-band").style.width = "7%";
-        $("vram-max").textContent = gb(g.mem_total_mib) + " GB";
-        $("util").textContent = n(g.util_pct, "%");
-        $("power").textContent = n(g.power_w) + " / " + n(g.power_limit_w, " W");
-        $("clock").textContent = n(g.sm_mhz, " MHz");
-        $("temp").textContent = n(g.temp_c, " °C");
-        $("throttle").textContent = g.throttle ? "yes" : "no";
-      } else {
-        $("vram").innerHTML = '–<span class="unit"> nvidia-smi not available here</span>';
-      }
-      var a = m.advice || {};
-      $("advice").className = "advice " + (a.level || ""); $("advice").textContent = a.text || "";
-      var r = m.ram || {};
-      if (r.total_gb) {
-        $("ram").innerHTML = (r.used_gb == null ? "–" : r.used_gb.toFixed(1)) + '<span class="unit"> / ' + r.total_gb.toFixed(0) + " GB</span>";
-        $("ram-fill").style.width = (r.used_gb == null ? 0 : 100 * r.used_gb / r.total_gb).toFixed(1) + "%";
-      }
-      $("procs").innerHTML = (m.procs || []).length ? m.procs.map(function (p) {
-        return "<tr><td>" + esc(p.pid) + "</td><td>" + esc(p.name) + "</td><td>" + (p.used_mib == null ? "hidden by Windows" : gb(p.used_mib) + " GB") + "</td></tr>"; }).join("")
-        : '<tr><td colspan="3">no process is using the GPU</td></tr>';
-      hist.push({ v: g.available ? 100 * g.mem_used_mib / g.mem_total_mib : null, u: g.available ? g.util_pct : null,
-                  r: r.total_gb && r.used_gb != null ? 100 * r.used_gb / r.total_gb : null });
-      if (hist.length > 300) hist.shift();
-      draw();
-    } catch (e) { $("advice").textContent = "metrics error: " + e.message; }
+  function buildSteps() {
+    var steps = [], by = {};
+    trace.events.forEach(function (e) {
+      var name = e.kind === "step" ? e.name : e.step;
+      if (!name) return;
+      var s = by[name];
+      if (!s) { s = by[name] = { name: name, kind: "code", state: "live", events: [], t0: e.t, t1: e.t, tokens: null, cost: null, tools: 0 }; steps.push(s); }
+      s.events.push(e); s.t1 = e.t;
+      if (e.kind === "step") { s.state = e.ok ? "ok" : "fail"; s.why = e.why; }
+      if (e.kind === "seat_start") { s.kind = "agent"; s.engine = e.engine; s.model = e.model; s.toolsList = e.tools; s.readOnly = e.read_only; s.systemFile = e.system_file; s.promptFile = e.prompt_file; s.budget = e.budget_usd; s.state = "live"; s.t0 = e.t; }
+      if (e.kind === "init") { s.initModel = e.model; s.initTools = e.tools; s.mcp = e.mcp_servers; }
+      if (e.kind === "tool_call") s.tools++;
+      if (e.kind === "usage") { s.tokens = e; if (e.cost_usd != null) s.cost = e.cost_usd; }
+      if (e.kind === "seat_end") { s.state = e.ok ? "ok" : "fail"; s.duration = e.duration_s; if (e.cost_usd != null) s.cost = e.cost_usd; if (e.tokens) s.tokens = e.tokens; s.error = e.error; }
+    });
+    // A step stays "live" only while nothing after it has started.
+    steps.forEach(function (s, i) { if (s.state === "live" && s.kind === "code" && i < steps.length - 1) s.state = "ok"; });
+    return steps;
   }
 
-  function draw() {
-    var c = $("hist"), g = c.getContext("2d"), dpr = Math.min(devicePixelRatio || 1, 2), W = c.clientWidth, H = c.clientHeight;
-    c.width = W * dpr; c.height = H * dpr; g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
-    g.fillStyle = "rgba(244,239,230,.10)"; g.fillRect(0, H * (1 - .92), W, H * .07);
-    g.strokeStyle = "rgba(244,239,230,.15)"; g.lineWidth = 1;
-    [0, .5, 1].forEach(function (f) { g.beginPath(); g.moveTo(0, H * f); g.lineTo(W, H * f); g.stroke(); });
-    function line(key, dash, width) {
-      g.setLineDash(dash); g.lineWidth = width; g.strokeStyle = "#f4efe6"; g.beginPath(); var on = false;
-      hist.forEach(function (p, i) { var v = p[key]; if (v == null) { on = false; return; }
-        var x = W * i / 299, y = H * (1 - v / 100); if (!on) { g.moveTo(x, y); on = true; } else g.lineTo(x, y); });
-      g.stroke(); g.setLineDash([]);
-    }
-    line("v", [], 2); line("u", [6, 4], 1.2); line("r", [2, 3], 1.2);
+  function renderTotals(steps) {
+    var r = trace.receipt || {}, t = { input: 0, output: 0, cache_read: 0, cache_write: 0 }, tools = 0, cost = 0;
+    steps.forEach(function (s) { if (s.tokens) { t.input += s.tokens.input || 0; t.output += s.tokens.output || 0; t.cache_read += s.tokens.cache_read || 0; t.cache_write += s.tokens.cache_write || 0; } tools += s.tools; cost += s.cost || 0; });
+    var live = steps.filter(function (s) { return s.state === "live"; }).pop();
+    var fin = steps.filter(function (s) { return s.name === "finish"; }).pop();
+    var status = fin ? (fin.state === "ok" ? "accepted" : "not accepted") : (live ? "running" : (steps.length ? "stopped" : "idle"));
+    var t0 = trace.events.length ? trace.events[0].t : null, t1 = trace.events.length ? trace.events[trace.events.length - 1].t : null;
+    var chips = [
+      ["Run", trace.run ? esc(trace.run) + (r.phase_name ? " · " + esc(r.phase_name) : "") : "none"],
+      ["Status", status + (live && !fin ? " · " + esc(live.name) : "")],
+      ["Tokens in", k(tin(t)) + " <span class='sub'>(" + k(t.cache_read) + " cached)</span>"],
+      ["Tokens out", k(t.output)], ["Tool calls", tools], ["Cost", usd(cost)],
+      ["Elapsed", t0 ? dur((fin || !live ? t1 : Date.now() / 1000) - t0) : "–"]
+    ];
+    $("totals").innerHTML = chips.map(function (c) { return '<span class="chip">' + c[0] + " <b>" + c[1] + "</b></span>"; }).join("");
   }
 
-  function seatState(receipt, active) {
-    var by = {}; (receipt && receipt.steps || []).forEach(function (s) { by[s.step] = s; });
-    var next = SEATS.find(function (n) { return !by[n]; });
-    return SEATS.map(function (n, i) {
-      var s = by[n], cls = s ? (s.ok ? "ok" : "fail") : (active && n === next ? "live" : "");
-      var label = s ? (s.ok ? "done" + (s.cost_usd ? " · $" + s.cost_usd.toFixed(2) : "") : "failed") : (cls === "live" ? "working…" : "waiting");
-      if (n === "tuner" && by.tuner && by.tuner.owner === "code") label = "not needed";
-      return '<div class="seat ' + cls + '"><div class="n">' + (i + 1) + " of 7</div><div class=\"s\">" + n + '</div><div class="n">' + label + "</div></div>";
+  function renderSteps(steps) {
+    if (!steps.length) { $("steps").innerHTML = '<li class="empty">No events yet.</li>'; return; }
+    $("steps").innerHTML = steps.map(function (s) {
+      var meta = s.kind === "agent"
+        ? [s.engine, s.tools + " tools", s.tokens ? k(tin(s.tokens)) + "/" + k(s.tokens.output) : "", s.engine === "codex" ? "" : (s.cost ? usd(s.cost) : ""), dur(s.duration)].filter(Boolean).join(" · ")
+        : esc(String(s.why || "").slice(0, 40));
+      var cls = "step " + s.kind + " " + s.state + (ui.selected === s.name ? " sel" : "");
+      return '<li class="' + cls + '" data-step="' + esc(s.name) + '" title="' + esc(s.why || s.error || "") + '"><span class="dot"></span><span class="nm">' + esc(s.name) +
+        (s.kind === "agent" ? "<small>agent</small>" : "<small>code</small>") + '</span><span class="meta">' + meta + "</span></li>";
     }).join("");
   }
 
-  async function state() {
+  function evCard(e, results) {
+    var t = '<span class="t">' + clock(e.t) + "</span>";
+    if (e.kind === "tool_call") {
+      var r = results[e.id];
+      return '<div class="ev' + (r && r.is_error ? " err" : "") + '"><div class="h"><span class="badge">' + esc(e.name) + "</span>" + (r ? "" : '<span class="sub">running…</span>') + t + "</div><pre>" + esc(e.input) + "</pre>" +
+        (r ? '<div class="out"><pre>' + esc(r.output || "(no output)") + "</pre></div>" : "") + "</div>";
+    }
+    if (e.kind === "text") return '<div class="ev text"><div class="h"><span class="badge">says</span>' + t + "</div><p>" + esc(e.text) + "</p></div>";
+    if (e.kind === "notice") return '<div class="ev"><div class="h"><span class="badge">notice</span>' + t + "</div><p>" + esc(e.text) + "</p></div>";
+    if (e.kind === "init") return '<div class="ev text"><div class="h"><span class="badge">session</span>' + t + "</div><p>model " + esc(e.model) + " · " + (e.tools || []).length + " tools · " + (e.mcp_servers || 0) + " MCP servers</p></div>";
+    if (e.kind === "output") return '<div class="ev text"><div class="h"><span class="badge">envelope</span>' + t + "</div><pre>" + esc(JSON.stringify(e.data, null, 2)) + "</pre></div>";
+    if (e.kind === "command_start") return "";
+    if (e.kind === "command_end") return '<div class="ev' + (e.status === "fail" ? " err" : "") + '"><div class="h"><span class="badge">' + esc(e.status) + "</span><span class='sub'>exit " + esc(e.exit_code) + (e.duration_s != null ? " · " + dur(e.duration_s) : "") + "</span>" + t + "</div><pre>" + esc(e.cmd) + '</pre><div class="out"><pre>' + esc(e.output || "") + "</pre></div></div>";
+    if (e.kind === "step") return '<div class="ev' + (e.ok ? "" : " err") + '"><div class="h"><span class="badge">' + (e.ok ? "ok" : "fail") + "</span>" + t + "</div><p>" + esc(e.why || "passed") + "</p></div>";
+    if (e.kind === "seat_end" && !e.ok) return '<div class="ev err"><div class="h"><span class="badge">failed</span>' + t + "</div><p>" + esc(e.error || "") + "</p></div>";
+    return "";
+  }
+
+  var lastAgentHtml = "";
+  function renderAgent(steps) {
+    var s = steps.filter(function (x) { return x.name === ui.selected; })[0];
+    var box = $("agent");
+    if (!s) { box.innerHTML = '<div class="empty">Pick a step on the left. The running agent is followed automatically.</div>'; lastAgentHtml = ""; return; }
+    var results = {}; s.events.forEach(function (e) { if (e.kind === "tool_result") results[e.id] = e; });
+    var cards = s.events.map(function (e) { return evCard(e, results); }).filter(Boolean).join("");
+    var html = "";
+    if (s.kind === "agent") {
+      var tk = s.tokens || {};
+      html += '<div class="agent-head"><span class="title">' + esc(s.name) + "</span><span class='sub'>" + esc(s.engine) + " · " + esc(s.initModel || s.model) + (s.readOnly ? " · read-only" : "") + " · budget " + usd(s.budget) + "</span>" +
+        '<span class="sub" style="margin-left:auto">' + (s.state === "live" ? "working…" : s.state === "ok" ? "done" : "failed") + "</span></div>";
+      html += '<div class="tools">' + (s.initTools || s.toolsList || []).map(function (t) { return '<span class="tool">' + esc(t) + "</span>"; }).join("") + "</div>";
+      html += '<div class="tiles">' +
+        [["Tokens in", k(tk.input)], ["Cache read", k(tk.cache_read)], ["Cache write", k(tk.cache_write)], ["Tokens out", k(tk.output)],
+         ["Tool calls", s.tools], ["Cost", s.engine === "codex" ? "plan" : usd(s.cost)], ["Time", dur(s.duration != null ? s.duration : (s.state === "live" ? Date.now() / 1000 - s.t0 : s.t1 - s.t0))]]
+          .map(function (x) { return '<div class="tile"><div class="k">' + x[0] + '</div><div class="v">' + x[1] + "</div></div>"; }).join("") + "</div>";
+      html += '<div class="row" style="margin:10px 0 4px">' +
+        '<button class="small ghost' + (ui.view === s.systemFile ? " on" : "") + '" data-file="' + esc(s.systemFile) + '">System prompt</button>' +
+        '<button class="small ghost' + (ui.view === s.promptFile ? " on" : "") + '" data-file="' + esc(s.promptFile) + '">Task prompt</button>' +
+        '<button class="small ghost' + (ui.view === s.name + ".json" ? " on" : "") + '" data-file="' + esc(s.name) + '.json">Envelope</button></div>';
+      if (ui.view) html += '<pre class="doc">' + esc(ui.viewText) + "</pre>";
+    } else {
+      html += '<div class="agent-head"><span class="title">' + esc(s.name) + "</span><span class='sub'>code step · " + (s.state === "ok" ? "passed" : s.state === "fail" ? "failed" : "running") + "</span></div>";
+    }
+    html += '<h2 style="margin-top:12px"><span>Live activity</span><label class="chk"><input type="checkbox" id="follow"' + (ui.follow ? " checked" : "") + "> follow the running agent</label></h2>";
+    html += '<div class="feed">' + (cards || '<div class="empty">waiting for the first event…</div>') + "</div>";
+    if (html === lastAgentHtml) return;
+    var feed = box.querySelector(".feed"), stick = !feed || feed.scrollTop + feed.clientHeight >= feed.scrollHeight - 20, keep = feed ? feed.scrollTop : 0;
+    var doc = box.querySelector("pre.doc"), docTop = doc ? doc.scrollTop : 0;
+    box.innerHTML = html; lastAgentHtml = html;
+    feed = box.querySelector(".feed"); feed.scrollTop = stick ? feed.scrollHeight : keep;
+    doc = box.querySelector("pre.doc"); if (doc) doc.scrollTop = docTop;
+  }
+
+  function render() {
+    var steps = buildSteps();
+    if (ui.follow) {
+      var live = steps.filter(function (s) { return s.state === "live" && s.kind === "agent"; }).pop() || steps.filter(function (s) { return s.state === "live"; }).pop();
+      if (live && live.name !== ui.selected) { ui.selected = live.name; ui.view = ""; }
+    }
+    if (!ui.selected && steps.length) { var agents = steps.filter(function (s) { return s.kind === "agent"; }); ui.selected = (agents.pop() || steps[steps.length - 1]).name; }
+    renderTotals(steps); renderSteps(steps); renderAgent(steps);
+  }
+
+  async function pollRuns() {
+    try {
+      var r = await getJSON("/api/runs"), pick = $("run-pick");
+      pick.innerHTML = r.runs.map(function (x) { return '<option value="' + esc(x.name) + '">' + esc(x.name) + (x.done ? (x.accepted ? " ✓" : " ✗") : " …") + "</option>"; }).join("");
+      var want = ui.pinnedRun || (r.runs[0] && r.runs[0].name) || "";
+      if (want) pick.value = want;
+      if (want !== trace.run) { trace = { run: want, seq: 0, events: [], receipt: null }; ui.selected = ""; ui.view = ""; lastAgentHtml = ""; }
+    } catch (e) { /* server restarting */ }
+  }
+  async function pollTrace() {
+    if (!trace.run) return;
+    try {
+      var run = trace.run, r = await getJSON("/api/trace?run=" + encodeURIComponent(run) + "&since=" + trace.seq);
+      if (run !== trace.run) return;
+      if (r.events && r.events.length) { trace.events = trace.events.concat(r.events); trace.seq = r.events[r.events.length - 1].seq; }
+      trace.receipt = r.receipt; render();
+    } catch (e) { /* ignore */ }
+  }
+  async function pollState() {
     try {
       var s = await getJSON("/api/state");
-      $("gate").textContent = "clinical gate: " + s.gate.state + " (" + s.gate.why + ")";
+      $("gate").textContent = "7 agents · model build plan · clinical gate " + s.gate.state;
       var pick = $("phase-pick"), cur = pick.value;
       pick.innerHTML = s.phases.map(function (p) { return '<option value="' + p.number + '">Phase ' + p.number + "</option>"; }).join("");
       if (cur) pick.value = cur;
-      $("phases").innerHTML = s.phases.map(function (p) {
-        var m = p.status || "idle", shown = p.status ? "[" + p.status + "]" : "[ ]";
-        return '<li><span class="mark ' + esc(m) + '">' + esc(shown) + "</span><span>Phase " + p.number + ": " + esc(p.name) +
-          '</span><span class="row">' + (p.gpu ? '<span class="tag">GPU</span>' : "") + (p.gated ? '<span class="tag">gated</span>' : "") + "</span></li>";
-      }).join("");
+      $("phases").innerHTML = s.phases.map(function (p) { var m = p.status || ""; return '<li><span class="mk ' + esc(m) + '">[' + esc(m || " ") + "]</span><span>" + p.number + ". " + esc(p.name) + (p.gated ? " <span class='sub'>(gated)</span>" : "") + "</span></li>"; }).join("");
       var run = s.run || {}, active = !!run.active;
-      $("seats").innerHTML = seatState(run.receipt, active);
-      $("run-state").innerHTML = active ? "running: " + esc(run.cmd) + " · started " + esc(run.started)
-        : (run.exit_code == null ? "idle" : "last run exited " + run.exit_code + (run.exit_code === 0 ? " (ok)" : " (see log)"));
-      ["b-next", "b-phase", "b-all"].forEach(function (id) { $(id).disabled = active; });
+      $("run-state").innerHTML = active ? "running: " + esc(run.cmd) : (run.exit_code == null ? "idle" : "last: " + esc(run.cmd) + " → exit " + run.exit_code);
+      ["b-self", "b-next", "b-phase", "b-all"].forEach(function (id) { $(id).disabled = active; });
       $("b-stop").disabled = !active;
-      if (run.log_tail != null) { var el = $("log"), stick = el.scrollTop + el.clientHeight >= el.scrollHeight - 8;
-        el.textContent = run.log_tail || "…"; if (stick) el.scrollTop = el.scrollHeight; }
-    } catch (e) { $("run-state").innerHTML = '<span class="err">state error: ' + esc(e.message) + "</span>"; }
+      if (run.log_tail != null) { var el = $("log"), stick = el.scrollTop + el.clientHeight >= el.scrollHeight - 8; el.textContent = run.log_tail || "…"; if (stick) el.scrollTop = el.scrollHeight; }
+    } catch (e) { $("run-state").innerHTML = '<span class="err-line">dashboard error: ' + esc(e.message) + "</span>"; }
+  }
+  async function pollMetrics() {
+    try {
+      var m = await getJSON("/api/metrics"), g = m.gpu || {};
+      if (g.available && g.mem_total_mib) {
+        var pct = 100 * g.mem_used_mib / g.mem_total_mib;
+        $("vram").innerHTML = gb(g.mem_used_mib) + '<span class="unit"> / ' + gb(g.mem_total_mib) + " GB · " + pct.toFixed(0) + "%</span>";
+        $("vram-fill").style.width = pct.toFixed(1) + "%"; $("vram-meter").classList.toggle("hot", pct > 95);
+        $("vram-max").textContent = gb(g.mem_total_mib) + " GB";
+        $("util").textContent = n(g.util_pct, "%"); $("power").textContent = n(g.power_w) + "/" + n(g.power_limit_w, " W");
+        $("clock").textContent = n(g.sm_mhz, " MHz"); $("temp").textContent = n(g.temp_c, " °C") + (g.throttle ? " ⚠" : "");
+      } else { $("vram").innerHTML = '–<span class="unit"> no NVIDIA reading here</span>'; }
+      var a = m.advice || {}; $("advice").className = "advice " + (a.level || ""); $("advice").textContent = a.text || "";
+      var r = m.ram || {};
+      if (r.total_gb) { $("ram").innerHTML = (r.used_gb == null ? "–" : r.used_gb.toFixed(1)) + '<span class="unit"> / ' + r.total_gb.toFixed(0) + " GB</span>"; $("ram-fill").style.width = (r.used_gb == null ? 0 : 100 * r.used_gb / r.total_gb).toFixed(1) + "%"; }
+      $("procs").innerHTML = (m.procs || []).length ? m.procs.map(function (p) { return "<tr><td>" + esc(p.pid) + "</td><td>" + esc(p.name) + "</td><td>" + (p.used_mib == null ? "hidden" : gb(p.used_mib) + " GB") + "</td></tr>"; }).join("") : '<tr><td colspan="3">nothing on the GPU</td></tr>';
+      hist.push({ v: g.available && g.mem_total_mib ? 100 * g.mem_used_mib / g.mem_total_mib : null, u: g.available ? g.util_pct : null, r: r.total_gb && r.used_gb != null ? 100 * r.used_gb / r.total_gb : null });
+      if (hist.length > 300) hist.shift(); draw();
+    } catch (e) { $("advice").textContent = "metrics error: " + e.message; }
+  }
+  function draw() {
+    var c = $("hist"), g = c.getContext("2d"), dpr = Math.min(devicePixelRatio || 1, 2), W = c.clientWidth, H = c.clientHeight;
+    if (!W) return; c.width = W * dpr; c.height = H * dpr; g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    g.fillStyle = "rgba(244,239,230,.10)"; g.fillRect(0, H * .08, W, H * .07);
+    function line(key, dash, width) { g.setLineDash(dash); g.lineWidth = width; g.strokeStyle = "#f4efe6"; g.beginPath(); var on = false;
+      hist.forEach(function (p, i) { var v = p[key]; if (v == null) { on = false; return; } var x = W * i / 299, y = H * (1 - v / 100); if (!on) { g.moveTo(x, y); on = true; } else g.lineTo(x, y); });
+      g.stroke(); g.setLineDash([]); }
+    line("v", [], 2); line("u", [6, 4], 1.2); line("r", [2, 3], 1.2);
   }
 
+  $("steps").addEventListener("click", function (ev) { var li = ev.target.closest("[data-step]"); if (!li) return; ui.selected = li.getAttribute("data-step"); ui.follow = false; ui.view = ""; render(); });
+  $("agent").addEventListener("click", async function (ev) {
+    var b = ev.target.closest("[data-file]"); if (!b) return;
+    var name = b.getAttribute("data-file"); if (ui.view === name) { ui.view = ""; render(); return; }
+    try { var r = await fetch("/api/file?run=" + encodeURIComponent(trace.run) + "&name=" + encodeURIComponent(name)); ui.viewText = await r.text(); } catch (e) { ui.viewText = String(e); }
+    ui.view = name; render();
+  });
+  $("agent").addEventListener("change", function (ev) { if (ev.target.id === "follow") { ui.follow = ev.target.checked; render(); } });
+  $("run-pick").addEventListener("change", function () { ui.pinnedRun = this.value; pollRuns().then(pollTrace); });
   function start(mode) {
     var body = { mode: mode, phase: Number($("phase-pick").value), dry_run: $("dry").checked, push: $("push").checked };
+    ui.pinnedRun = ""; ui.follow = true;
     getJSON("/api/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
-      .then(state).catch(function (e) { alert(e.message); });
+      .then(function () { setTimeout(pollRuns, 1500); pollState(); }).catch(function (e) { alert(e.message); });
   }
+  $("b-self").onclick = function () { start("selftest"); };
   $("b-next").onclick = function () { start("next"); };
   $("b-phase").onclick = function () { start("phase"); };
   $("b-all").onclick = function () { if (confirm("Run every remaining phase in order until one stops?")) start("all"); };
-  $("b-stop").onclick = function () { if (confirm("Stop the running workflow?")) getJSON("/api/stop", { method: "POST" }).then(state); };
+  $("b-stop").onclick = function () { if (confirm("Stop the running workflow?")) getJSON("/api/stop", { method: "POST" }).then(pollState); };
 
-  metrics(); state();
-  setInterval(metrics, 2000); setInterval(state, 2000);
+  pollState(); pollMetrics(); pollRuns().then(pollTrace);
+  setInterval(pollState, 2000); setInterval(pollMetrics, 2000); setInterval(pollRuns, 4000); setInterval(pollTrace, 1000);
   addEventListener("resize", draw);
 })();
 </script>
