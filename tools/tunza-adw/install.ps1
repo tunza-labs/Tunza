@@ -67,15 +67,16 @@ if (-not $Root) {
 }
 Say "using checkout $Root"
 
-# 3. Make sure the tool is in the checkout ---------------------------------
+# 3. Bring the checkout up to date (only when it is clean) ------------------
 $Tool = Join-Path $Root "tools\tunza-adw\adw.py"
-if (-not (Test-Path $Tool)) {
-  $branch = (git -C $Root branch --show-current).Trim()
-  $dirty = git -C $Root status --porcelain --untracked-files=no
-  if ($branch -eq "main" -and -not $dirty) {
-    Say "updating main"
-    git -C $Root pull --ff-only origin main
-  }
+$branch = (git -C $Root branch --show-current).Trim()
+$dirty = git -C $Root status --porcelain --untracked-files=no
+if (-not $dirty -and ($branch -eq "main" -or $branch -like "adw/*")) {
+  if ($branch -ne "main") { Say "switching from $branch to main"; git -C $Root switch main }
+  Say "updating main"
+  git -C $Root pull --ff-only origin main
+} elseif ($dirty) {
+  Warn "checkout has uncommitted changes on $branch; not updating it"
 }
 if (-not (Test-Path $Tool)) {
   throw "tools\tunza-adw is not in $Root (branch $(git -C $Root branch --show-current)). " +
@@ -86,7 +87,11 @@ if (-not (Test-Path $Tool)) {
 $Bin = "$HOME\.local\bin"
 New-Item -ItemType Directory -Force -Path $Bin | Out-Null
 $Shim = Join-Path $Bin "tunza-adw.cmd"
-Set-Content -Path $Shim -Encoding ASCII -Value "@echo off`r`nuv run --script `"$Tool`" %*"
+# Absolute uv path: a desktop icon does not see PATH changes until the next sign-in.
+$Uv = (Get-Command uv).Source
+Set-Content -Path $Shim -Encoding ASCII -Value ("@echo off`r`n" +
+  "`"$Uv`" run --script `"$Tool`" %*`r`n" +
+  "if errorlevel 1 if /i `"%~1`"==`"ui`" (echo. & echo tunza-adw stopped with an error. Copy the text above. & pause)")
 $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
 if (-not ($userPath -split ";" | Where-Object { $_ -eq $Bin })) {
   [Environment]::SetEnvironmentVariable("Path", ($userPath.TrimEnd(";") + ";" + $Bin), "User")
