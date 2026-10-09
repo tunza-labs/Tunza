@@ -85,3 +85,9 @@ with a verdict on whether the model is using the card fully (target 85–92%).
 Verified on a Mac: 21 pipeline tests, and a live toy run where real Claude
 seats and a Codex reviewer built, checked, reviewed and committed one phase.
 Not yet run on the PC itself.
+
+2026-10-09: each agent now runs isolated (own system prompt, explicit tools, no
+MCP servers or user hooks) and streams every tool call, result and token count
+to the dashboard live. `tunza-adw selftest` (dashboard button: Self-test) runs a
+toy phase through all seven agents on the machine and prints SELF-TEST PASSED
+with a per-seat table. Passed on the Mac; run it on the PC first.

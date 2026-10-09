@@ -17,19 +17,47 @@ clones the Tunza checkout, adds a `tunza-adw` command and a **Tunza ADW**
 desktop icon, then runs `tunza-adw doctor`. If Claude Code is new on the
 machine, run `claude` once and log in.
 
+## Prove it works on this machine
+
+Press **Self-test** in the dashboard (or run `tunza-adw selftest`). It builds a
+throwaway repo with a one-step toy phase and runs it through all seven agents
+on this PC: real Claude seats, Codex as reviewer, the PowerShell checks, the GPU
+reading, the commit. It costs about $0.05 to $0.10 and ends with
+`SELF-TEST PASSED` and a table of every seat's engine, model, tokens, tool calls
+and cost. Run it before the first real phase and after any change to the box.
+
 ## Use it
 
-- Double-click **Tunza ADW** on the desktop (or run `tunza-adw ui`). The red
-  dashboard opens at `http://127.0.0.1:8787`:
-  - **Left:** run the next phase, one phase, or all of them; the 7 agents'
-    progress; the plan's phase markers; the live log.
-  - **Right:** live GPU memory used by the model against the 32 GB card, with
-    the 85–92% target band, GPU busy %, power, clocks, throttling, system RAM,
-    a 10-minute history, and the processes on the GPU. A one-line verdict says
-    whether the model is using the card fully and what to change if not.
-- Terminal: `tunza-adw status`, `tunza-adw run --next`, `tunza-adw run --phase 3`,
-  `tunza-adw run --all`, `--dry-run` to see the steps without calling a model,
-  `--push` to push the `adw/` branch once a phase is accepted.
+Double-click **Tunza ADW** on the desktop (or run `tunza-adw ui`). The red
+dashboard opens at `http://127.0.0.1:8787`:
+
+- **Top:** the run, its status and the current step, total tokens in (and how
+  many were cached), tokens out, tool calls, cost and elapsed time.
+- **Left:** Self-test, run the next phase / one phase / all; the **step by step**
+  list of every code check and agent with its tools, tokens, cost and time;
+  the plan's phase markers.
+- **Middle:** the selected agent, followed live: its model, its exact tool list,
+  token and cost tiles, its **system prompt**, its **task prompt**, its final
+  **envelope**, and every tool call as it happens with the input it sent and
+  the output it got back. Code steps show each validation command with its
+  exit code and output.
+- **Right:** live GPU memory used by the model against the 32 GB card, with
+  the 85–92% target band, GPU busy %, power, clocks, system RAM, a 10-minute
+  history, and a one-line verdict on whether the model uses the card fully.
+
+Terminal: `tunza-adw status`, `tunza-adw run --next`, `tunza-adw run --phase 3`,
+`tunza-adw run --all`, `--dry-run` to see the steps without calling a model,
+`--push` to push the `adw/` branch once a phase is accepted.
+
+## How each agent runs
+
+Every seat is a fresh headless session with its own system prompt
+(`seats/_shared.md` + `seats/<seat>.md`), exactly the tools listed for it in
+`config.json`, no MCP servers, and no user hooks or plugins, so nothing else
+installed on the machine leaks into its context. Its events stream into
+`.tunza-adw/runs/<run>/events.jsonl` (one line per tool call, result, message
+and token update), next to `<seat>.system.md`, `<seat>.prompt.md`,
+`<seat>.json` (the envelope) and `receipt.json` (steps, totals, cost).
 
 ## How a phase runs
 
@@ -67,7 +95,8 @@ this public repo, `git push` without `--push`, or reboot the box.
 uv run --with pytest python -m pytest tools/tunza-adw/tests -q
 ```
 
-The tests run the whole pipeline in a throwaway repo with stand-in agents:
+The tests run the whole pipeline in a throwaway repo with stand-in agents and
+check the live trace, the Claude and Codex event parsers,
 the happy path, the gate, read-only violations, false file claims, the repair
 limit, uncovered plan checks, reviewer and documenter refusals, the budget,
 and the tuner's file limits.

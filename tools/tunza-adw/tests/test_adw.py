@@ -53,9 +53,21 @@ class FakeSeats:
         self.root, self.behaviours, self.cost, self.mod = root, behaviours, cost, mod
         self.calls: list[str] = []
 
-    def call(self, seat, prompt, budget):
+    def system_prompt(self, seat):
+        return f"system prompt for {seat}"
+
+    def engine_for(self, seat):
+        return self
+
+    def call(self, seat, prompt, budget, system_file, emit):
         self.calls.append(seat)
-        return self.mod.SeatResult(self.behaviours[seat](prompt, self.root), self.cost, "fake")
+        assert system_file.read_text() == f"system prompt for {seat}"
+        emit("init", model="fake", tools=self.config["seats"][seat]["tools"], mcp_servers=0, session_id="s")
+        emit("tool_call", id="t1", name="Read", input='{"file_path": "x"}')
+        emit("tool_result", id="t1", output="contents", is_error=False)
+        usage = {"input": 10, "output": 5, "cache_read": 100, "cache_write": 0}
+        emit("usage", **usage, cost_usd=self.cost, final=True)
+        return self.mod.SeatResult(self.behaviours[seat](prompt, self.root), self.cost, "fake", usage)
 
 
 def happy(mod, phase):
@@ -347,3 +359,68 @@ def test_gpu_reading_survives_windows_na_fields_and_renamed_throttle(repo, monke
     procs = mod.gpu_procs()
     assert procs == [{"pid": 4242, "name": "python.exe", "used_mib": None}]
     assert mod.memory_advice(g, procs)["level"] == "full"
+
+
+def test_trace_records_every_seat_tool_call_and_tokens(repo):
+    root, mod = repo
+    _git(root, "switch", "-qc", "adw/t")
+    p6 = phase_n(mod, 6)
+    run, _ = make_run(mod, root, p6, happy(mod, p6))
+    assert run.execute() == 0
+    events = [json.loads(l) for l in (run.run_dir / "events.jsonl").read_text().splitlines()]
+    starts = [e["seat"] for e in events if e["kind"] == "seat_start"]
+    assert starts == ["scout", "planner", "builder", "gatekeeper", "reviewer", "documenter"]
+    assert sum(e["kind"] == "tool_call" for e in events) == 6
+    assert any(e["kind"] == "command_end" and e["status"] == "pass" for e in events)
+    assert [e["seq"] for e in events] == list(range(1, len(events) + 1))
+    receipt = json.loads((run.run_dir / "receipt.json").read_text())
+    assert receipt["totals"] == {"input": 60, "output": 30, "cache_read": 600, "cache_write": 0, "tool_calls": 6}
+    assert (run.run_dir / "builder.system.md").exists() and (run.run_dir / "builder.prompt.md").exists()
+    trace = mod.read_trace(run.run_dir.name, since=len(events) - 2)
+    assert [e["seq"] for e in trace["events"]] == [len(events) - 1, len(events)]
+    assert mod.read_run_file(run.run_dir.name, "../receipt.json") is None
+
+
+def test_claude_stream_parser(repo):
+    _, mod = repo
+    seen = []
+    s = mod.ClaudeStream(lambda kind, **d: seen.append((kind, d)))
+    lines = [
+        {"type": "system", "subtype": "init", "model": "claude-x", "tools": ["Read", "Bash"], "mcp_servers": []},
+        {"type": "assistant", "message": {"id": "m1", "usage": {"input_tokens": 3, "output_tokens": 9,
+         "cache_read_input_tokens": 50}, "content": [{"type": "tool_use", "id": "u1", "name": "Bash",
+         "input": {"command": "echo hi"}}]}},
+        {"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "u1", "content": "hi"}]}},
+        {"type": "assistant", "message": {"id": "m2", "content": [{"type": "tool_use", "id": "u2",
+         "name": "StructuredOutput", "input": {"status": "ok"}}]}},
+        {"type": "result", "subtype": "success", "total_cost_usd": 0.02, "num_turns": 2,
+         "usage": {"input_tokens": 5, "output_tokens": 20, "cache_read_input_tokens": 80,
+                   "cache_creation_input_tokens": 7}, "structured_output": {"status": "ok"}},
+    ]
+    for line in lines:
+        s.feed(json.dumps(line))
+    s.feed("not json")
+    kinds = [k for k, _ in seen]
+    assert kinds[:3] == ["init", "usage", "tool_call"] and "tool_result" in kinds and "output" in kinds
+    assert s.structured == {"status": "ok"} and s.cost == 0.02
+    assert s.usage == {"input": 5, "output": 20, "cache_read": 80, "cache_write": 7}
+
+
+def test_codex_stream_parser(repo):
+    _, mod = repo
+    seen = []
+    s = mod.CodexStream(lambda kind, **d: seen.append((kind, d)), "")
+    for line in [
+        {"type": "thread.started", "thread_id": "th"},
+        {"type": "item.completed", "item": {"id": "i0", "type": "error", "message": "warning"}},
+        {"type": "item.started", "item": {"id": "i1", "type": "command_execution", "command": "ls"}},
+        {"type": "item.completed", "item": {"id": "i1", "type": "command_execution", "command": "ls",
+                                            "aggregated_output": "a.py", "exit_code": 2}},
+        {"type": "item.completed", "item": {"id": "i2", "type": "agent_message", "text": "looks fine"}},
+        {"type": "turn.completed", "usage": {"input_tokens": 100, "cached_input_tokens": 60, "output_tokens": 7}},
+    ]:
+        s.feed(json.dumps(line))
+    kinds = [k for k, _ in seen]
+    assert kinds == ["init", "tool_call", "tool_result", "text", "usage"]
+    assert seen[2][1]["is_error"] is True
+    assert s.usage == {"input": 40, "output": 7, "cache_read": 60, "cache_write": 0}
