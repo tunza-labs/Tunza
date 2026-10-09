@@ -140,6 +140,7 @@ td, th { text-align: left; padding: 4px 6px; border-top: 1px solid var(--line); 
   var hist = [], $ = function (id) { return document.getElementById(id); };
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); }
   function gb(mib) { return mib == null ? "–" : (mib / 1024).toFixed(1); }
+  function n(v, unit) { return v == null ? "–" : Math.round(v) + (unit || ""); }
 
   async function getJSON(url, opts) { var r = await fetch(url, opts); if (!r.ok) throw new Error(await r.text()); return r.json(); }
 
@@ -153,10 +154,10 @@ td, th { text-align: left; padding: 4px 6px; border-top: 1px solid var(--line); 
         $("vram-meter").classList.toggle("hot", pct > 95);
         $("vram-band").style.left = "85%"; $("vram-band").style.width = "7%";
         $("vram-max").textContent = gb(g.mem_total_mib) + " GB";
-        $("util").textContent = g.util_pct + "%";
-        $("power").textContent = Math.round(g.power_w) + " / " + Math.round(g.power_limit_w) + " W";
-        $("clock").textContent = g.sm_mhz + " MHz";
-        $("temp").textContent = g.temp_c + " °C";
+        $("util").textContent = n(g.util_pct, "%");
+        $("power").textContent = n(g.power_w) + " / " + n(g.power_limit_w, " W");
+        $("clock").textContent = n(g.sm_mhz, " MHz");
+        $("temp").textContent = n(g.temp_c, " °C");
         $("throttle").textContent = g.throttle ? "yes" : "no";
       } else {
         $("vram").innerHTML = '–<span class="unit"> nvidia-smi not available here</span>';
@@ -169,7 +170,7 @@ td, th { text-align: left; padding: 4px 6px; border-top: 1px solid var(--line); 
         $("ram-fill").style.width = (r.used_gb == null ? 0 : 100 * r.used_gb / r.total_gb).toFixed(1) + "%";
       }
       $("procs").innerHTML = (m.procs || []).length ? m.procs.map(function (p) {
-        return "<tr><td>" + esc(p.pid) + "</td><td>" + esc(p.name) + "</td><td>" + gb(p.used_mib) + " GB</td></tr>"; }).join("")
+        return "<tr><td>" + esc(p.pid) + "</td><td>" + esc(p.name) + "</td><td>" + (p.used_mib == null ? "hidden by Windows" : gb(p.used_mib) + " GB") + "</td></tr>"; }).join("")
         : '<tr><td colspan="3">no process is using the GPU</td></tr>';
       hist.push({ v: g.available ? 100 * g.mem_used_mib / g.mem_total_mib : null, u: g.available ? g.util_pct : null,
                   r: r.total_gb && r.used_gb != null ? 100 * r.used_gb / r.total_gb : null });

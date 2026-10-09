@@ -165,7 +165,9 @@ def test_memory_advice_pushes_toward_full_use(repo):
     _, mod = repo
     g = {"available": True, "mem_total_mib": 32607, "util_pct": 99}
     proc = [{"pid": 1, "name": "python", "used_mib": 1}]
-    assert mod.memory_advice({**g, "mem_used_mib": 1000}, [])["level"] == "idle"
+    assert mod.memory_advice({**g, "mem_used_mib": 1000, "util_pct": 0}, [])["level"] == "idle"
+    # Windows (WDDM) often lists no per-process memory while a job runs: judge by the card itself.
+    assert mod.memory_advice({**g, "mem_used_mib": 29000}, [])["level"] == "full"
     assert mod.memory_advice({**g, "mem_used_mib": 16000}, proc)["level"] == "headroom"
     assert mod.memory_advice({**g, "mem_used_mib": 29000}, proc)["level"] == "full"
     assert mod.memory_advice({**g, "mem_used_mib": 29000, "util_pct": 40}, proc)["level"] == "headroom"
@@ -328,3 +330,20 @@ def test_tuner_may_only_touch_configs(repo):
     run, seats = make_run(mod, root, p3, b)
     assert run.execute() == 1
     assert "gatekeeper" not in seats.calls
+
+
+def test_gpu_reading_survives_windows_na_fields_and_renamed_throttle(repo, monkeypatch):
+    _, mod = repo
+    answers = {
+        "name,memory.used,memory.total,utilization.gpu,power.draw,power.limit,clocks.sm,temperature.gpu":
+            [["NVIDIA GeForce RTX 5090", "28123", "32607", "98", "[N/A]", "575.00", "2700", "71"]],
+        "clocks_event_reasons.active": None,          # older driver: unknown field
+        "clocks_throttle_reasons.active": [["0x0000000000000004"]],
+        "pid,process_name,used_memory": [["4242", "C:\\Python\\python.exe", "[N/A]"]],
+    }
+    monkeypatch.setattr(mod, "_smi", lambda fields, kind="gpu": answers.get(fields))
+    g = mod.gpu_metrics()
+    assert g["available"] and g["mem_used_mib"] == 28123 and g["power_w"] is None and g["throttle"]
+    procs = mod.gpu_procs()
+    assert procs == [{"pid": 4242, "name": "python.exe", "used_mib": None}]
+    assert mod.memory_advice(g, procs)["level"] == "full"

@@ -693,47 +693,51 @@ DRY_STEPS = [
 VRAM_TARGET = (85.0, 92.0)
 
 
-def gpu_metrics() -> dict:
+def _num(v: str) -> float | None:
+    """nvidia-smi prints [N/A] or [Not Supported] for fields Windows (WDDM) hides."""
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _smi(fields: str, kind: str = "gpu") -> list[list[str]] | None:
     smi = shutil.which("nvidia-smi")
     if not smi:
-        return {"available": False}
-    q = ("name,memory.used,memory.total,utilization.gpu,power.draw,power.limit,clocks.sm,"
-         "temperature.gpu,clocks_throttle_reasons.active")
-    proc = subprocess.run([smi, f"--query-gpu={q}", "--format=csv,noheader,nounits"],
-                          capture_output=True, text=True)
-    if proc.returncode != 0 or not proc.stdout.strip():
-        return {"available": False}
-    f = [x.strip() for x in proc.stdout.splitlines()[0].split(",")]
+        return None
+    try:
+        proc = subprocess.run([smi, f"--query-{kind}={fields}", "--format=csv,noheader,nounits"],
+                              capture_output=True, text=True, timeout=15)
+    except (subprocess.TimeoutExpired, OSError):
+        return None
+    if proc.returncode != 0:
+        return None
+    return [[x.strip() for x in line.split(",")] for line in proc.stdout.splitlines() if line.strip()]
 
-    def num(v: str) -> float | None:
-        try:
-            return float(v)
-        except ValueError:
-            return None
 
-    throttle = f[8].lower()
-    return {"available": True, "name": f[0], "mem_used_mib": num(f[1]), "mem_total_mib": num(f[2]),
-            "util_pct": num(f[3]), "power_w": num(f[4]), "power_limit_w": num(f[5]),
-            "sm_mhz": num(f[6]), "temp_c": num(f[7]),
+def gpu_metrics() -> dict:
+    rows = _smi("name,memory.used,memory.total,utilization.gpu,power.draw,power.limit,clocks.sm,temperature.gpu")
+    if not rows or len(rows[0]) < 8:
+        return {"available": False}
+    f = rows[0]
+    # The throttle field was renamed in newer drivers (clocks_event_reasons); an unknown
+    # field makes nvidia-smi fail the whole query, so ask for it on its own.
+    reasons = _smi("clocks_event_reasons.active") or _smi("clocks_throttle_reasons.active")
+    flag = reasons[0][0].lower() if reasons else ""
+    return {"available": True, "name": f[0], "mem_used_mib": _num(f[1]), "mem_total_mib": _num(f[2]),
+            "util_pct": _num(f[3]), "power_w": _num(f[4]), "power_limit_w": _num(f[5]),
+            "sm_mhz": _num(f[6]), "temp_c": _num(f[7]),
             # 0x1 is plain idle; anything else is a real slowdown (power, thermal, ...)
-            "throttle": throttle not in ("0x0000000000000000", "0x0000000000000001", "[n/a]", "")}
+            "throttle": bool(flag) and flag not in ("0x0000000000000000", "0x0000000000000001", "[n/a]")}
 
 
 def gpu_procs() -> list[dict]:
-    smi = shutil.which("nvidia-smi")
-    if not smi:
-        return []
-    proc = subprocess.run([smi, "--query-compute-apps=pid,process_name,used_memory",
-                           "--format=csv,noheader,nounits"], capture_output=True, text=True)
     rows = []
-    for line in proc.stdout.splitlines():
-        parts = [x.strip() for x in line.split(",")]
-        if len(parts) == 3:
-            try:
-                rows.append({"pid": int(parts[0]), "name": Path(parts[1]).name, "used_mib": float(parts[2])})
-            except ValueError:
-                continue
-    return sorted(rows, key=lambda r: -r["used_mib"])
+    for parts in _smi("pid,process_name,used_memory", "compute-apps") or []:
+        if len(parts) == 3 and parts[0].isdigit():
+            rows.append({"pid": int(parts[0]), "name": Path(parts[1].replace("\\", "/")).name,
+                         "used_mib": _num(parts[2])})
+    return sorted(rows, key=lambda r: -(r["used_mib"] or 0))
 
 
 def system_ram() -> dict:
@@ -769,13 +773,14 @@ def system_ram() -> dict:
 
 def memory_advice(gpu: dict, procs: list[dict]) -> dict:
     """One plain sentence on whether the model is using the card fully."""
-    if not gpu.get("available"):
-        return {"level": "idle", "text": "No NVIDIA GPU visible on this machine."}
+    if not gpu.get("available") or not gpu.get("mem_total_mib") or gpu.get("mem_used_mib") is None:
+        return {"level": "idle", "text": "No NVIDIA GPU reading on this machine."}
     pct = 100 * gpu["mem_used_mib"] / gpu["mem_total_mib"]
     free_gb = (gpu["mem_total_mib"] - gpu["mem_used_mib"]) / 1024
     util = gpu["util_pct"] or 0
     lo, hi = VRAM_TARGET
-    if not procs:
+    # Windows often hides per-process memory, so "busy" also counts load on the card itself.
+    if not procs and util < 5 and pct < 15:
         return {"level": "idle", "text": "GPU idle: no model loaded. Idle hours count against the buy bar; "
                                          "queue the next job."}
     if pct > 95:
@@ -882,6 +887,18 @@ def cmd_ui(args) -> int:
             self.wfile.write(body)
 
         def do_GET(self) -> None:
+            try:
+                self._get()
+            except Exception as exc:  # show the error in the page instead of a dead connection
+                self.send(500, {"error": f"{type(exc).__name__}: {exc}"})
+
+        def do_POST(self) -> None:
+            try:
+                self._post()
+            except Exception as exc:
+                self.send(500, {"error": f"{type(exc).__name__}: {exc}"})
+
+        def _get(self) -> None:
             if self.path in ("/", "/index.html"):
                 return self.send(200, (TOOL / "ui.html").read_bytes(), "text/html; charset=utf-8")
             if self.path == "/api/metrics":
@@ -898,7 +915,7 @@ def cmd_ui(args) -> int:
                 return self.send(200, {"phases": phases, "gate": {"state": state, "why": why}, "run": run_state()})
             self.send(404, {"error": "not found"})
 
-        def do_POST(self) -> None:
+        def _post(self) -> None:
             # Same-origin only: the page is served from this server, nothing else may start runs.
             origin = self.headers.get("Origin")
             if origin and origin not in (f"http://127.0.0.1:{args.port}", f"http://localhost:{args.port}"):
@@ -915,8 +932,14 @@ def cmd_ui(args) -> int:
                 return self.send(200, stop())
             self.send(404, {"error": "not found"})
 
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
     url = f"http://127.0.0.1:{args.port}/"
+    try:
+        server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
+    except OSError:
+        print(f"The dashboard is already running at {url} (or port {args.port} is busy). Opening it.")
+        if not args.no_open:
+            webbrowser.open(url)
+        return 0
     print(f"Tunza ADW dashboard: {url}  (Ctrl+C to quit)")
     if not args.no_open:
         webbrowser.open(url)
@@ -973,6 +996,19 @@ def cmd_doctor(_args) -> int:
     claude = claude_exe()
     ver = subprocess.run([claude, "--version"], capture_output=True, text=True).stdout.strip() if claude else ""
     row("claude", bool(claude), ver or "missing: irm https://claude.ai/install.ps1 | iex")
+    if claude:
+        try:
+            probe = subprocess.run([claude, "-p", "Reply with the word ok.", "--model", "haiku",
+                                    "--output-format", "json", "--no-session-persistence"],
+                                   capture_output=True, text=True, timeout=120, cwd=ROOT,
+                                   encoding="utf-8", errors="replace")
+            out = json.loads(probe.stdout or "{}")
+            logged_in = probe.returncode == 0 and not out.get("is_error")
+            detail = "can call a model" if logged_in else \
+                f"cannot call a model: {(out.get('result') or probe.stderr or probe.stdout)[:160].strip()}"
+        except (subprocess.TimeoutExpired, json.JSONDecodeError, OSError) as exc:
+            logged_in, detail = False, f"cannot call a model: {exc}"
+        row("claude login", logged_in, detail + ("" if logged_in else " -> run 'claude' once and log in"))
     if claude and claude.lower().endswith((".cmd", ".bat")):
         row("claude.exe", False, "only the npm claude.cmd was found; install the native one: "
             "irm https://claude.ai/install.ps1 | iex")
