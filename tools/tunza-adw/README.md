@@ -47,7 +47,9 @@ dashboard opens at `http://127.0.0.1:8787`:
 
 Terminal: `tunza-adw status`, `tunza-adw run --next`, `tunza-adw run --phase 3`,
 `tunza-adw run --all`, `--dry-run` to see the steps without calling a model,
-`--push` to push the `adw/` branch once a phase is accepted.
+`--push` to push the `adw/` branch once a phase is accepted, `--merge` to
+push that branch and squash-merge it into the repo. It never pushes the
+default branch.
 
 ## How each agent runs
 
@@ -77,7 +79,7 @@ code checks every claim against `git` and real command output.
 | 6 reviewer | agent, read-only | Codex if installed (a second model family), else Claude; checks each plan item against evidence |
 | accept | code | Tests green AND gatekeeper pass AND reviewer approved |
 | 7 documenter | agent | `vault/training.md` and a session note; code sets the plan markers |
-| commit | code | Local commit on the `adw/` branch; push only with `--push` |
+| commit | code | Local commit on the `adw/` branch; push with `--push`; merge with `--merge` |
 
 Read-only seats that edit a file fail the run. Each phase has a dollar budget
 (`config.json`, default $40), and every run writes a receipt to
@@ -87,7 +89,7 @@ Read-only seats that edit a file fail the run. Each phase has a dollar budget
 
 Sign or fill the opening criteria, write clinical labels or thresholds, train
 on clinical data before the gate opens, commit data, weights or run output to
-this public repo, `git push` without `--push`, or reboot the box.
+this public repo, `git push` without `--push` or `--merge`, or reboot the box.
 
 ## Tests
 
