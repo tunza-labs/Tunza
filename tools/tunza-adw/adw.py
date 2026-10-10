@@ -16,8 +16,9 @@
 
 Code owns the order, the gates and the verdict. Agents fill typed envelopes.
 Seats: scout, planner, builder, tuner, gatekeeper, reviewer, documenter.
-Nothing is pushed unless --push is given. Clinical training stays behind
-training/gate.py, which agents never sign.
+Nothing is pushed unless --push or --merge is given. --merge also opens a
+pull request and squash-merges it. The default branch is never pushed.
+Clinical training stays behind training/gate.py, which agents never sign.
 """
 
 from __future__ import annotations
@@ -596,6 +597,7 @@ class Run:
     budget: float
     dry_run: bool = False
     push: bool = False
+    merge: bool = False
     spent: float = 0.0
     steps: list[dict] = field(default_factory=list)
     envelopes: dict[str, Any] = field(default_factory=dict)
@@ -894,12 +896,37 @@ class Run:
         git("add", "--", *paths, check=True)
         msg = f"adw(phase {self.phase.number}): {self.phase.name} [{self.run_id}]"
         git("commit", "-m", msg, check=True)
+        branch = git("branch", "--show-current").strip()
         sha = git("rev-parse", "--short", "HEAD").strip()
-        self.log("commit", "code", True, why=f"{sha} on {git('branch', '--show-current').strip()}")
-        if self.push:
-            branch = git("branch", "--show-current").strip()
-            git("push", "-u", "origin", branch, check=True)
-            self.log("push", "code", True, why=f"origin/{branch}")
+        self.log("commit", "code", True, why=f"{sha} on {branch}")
+        if self.push or self.merge:
+            self.land(branch)
+
+    def land(self, branch: str) -> None:
+        """Push the adw branch, and merge it only when asked. Never the default branch."""
+        default = "main"
+        ref = git("symbolic-ref", "--short", "refs/remotes/origin/HEAD").strip()
+        if ref.startswith("origin/"):
+            default = ref.split("/", 1)[1]
+        for step in land_plan(branch, default, self.push, self.merge):
+            if step.startswith("push "):
+                git("push", "-u", "origin", branch, check=True)
+                self.log("push", "code", True, why=f"origin/{branch}")
+            elif step.startswith("pr "):
+                view = subprocess.run(["gh", "pr", "view", branch, "--json", "url"],
+                                      cwd=ROOT, capture_output=True, text=True)
+                if view.returncode != 0:
+                    created = subprocess.run(
+                        ["gh", "pr", "create", "--base", default, "--head", branch, "--fill"],
+                        cwd=ROOT, capture_output=True, text=True)
+                    if created.returncode != 0:
+                        raise RuntimeError((created.stderr or created.stdout or "could not open the pull request").strip())
+            elif step.startswith("squash-merge "):
+                merged = subprocess.run(["gh", "pr", "merge", branch, "--squash"],
+                                        cwd=ROOT, capture_output=True, text=True)
+                if merged.returncode != 0:
+                    raise RuntimeError((merged.stderr or merged.stdout or "could not merge").strip())
+                self.log("merge", "code", True, why=f"{branch} into {default}")
 
 
 DRY_STEPS = [
@@ -916,8 +943,27 @@ DRY_STEPS = [
     ("reviewer", "agent", "read-only, Codex if installed: checks each plan item against evidence"),
     ("accept", "code", "green quality AND gatekeeper pass AND reviewer approved"),
     ("documenter", "agent", "vault/training.md + session note; code sets plan markers"),
-    ("commit", "code", "local commit on the adw branch; push only with --push"),
+    ("commit", "code", "local commit on the adw branch; push with --push; merge with --merge"),
 ]
+
+
+def publish_ref(branch: str, default: str) -> str:
+    """The branch a landing may push. Never the default branch."""
+    if not branch or branch == default:
+        raise RuntimeError(f"refusing to push {default or 'the default branch'}")
+    return branch
+
+
+def land_plan(branch: str, default: str, push: bool, merge: bool) -> list[str]:
+    """What a landing will do. Empty unless push or merge was asked."""
+    if not push and not merge:
+        return []
+    ref = publish_ref(branch, default)
+    steps = [f"push {ref}"]
+    if merge:
+        steps.append(f"pr {ref} into {default}")
+        steps.append(f"squash-merge {ref}")
+    return steps
 
 
 
@@ -1131,6 +1177,8 @@ def cmd_ui(args) -> int:
                 argv.append("--dry-run")
             if body.get("push") and mode != "selftest":
                 argv.append("--push")
+            if body.get("merge") and mode != "selftest":
+                argv.append("--merge")
             stamp = time.strftime("%Y%m%d-%H%M%S")
             active.log_path = log_dir / f"run-{stamp}.log"
             log = open(active.log_path, "w", encoding="utf-8")
@@ -1430,7 +1478,8 @@ def cmd_run(args) -> int:
         run_dir = RUNS_DIR / f"{RUN_PREFIX}{run_id}-p{phase.number}"
         run_dir.mkdir(parents=True, exist_ok=True)
         run = Run(phase=phase, run_id=run_id, run_dir=run_dir, seats=Seats(config, run_dir),
-                  budget=args.budget or config["phase_budget_usd"], dry_run=args.dry_run, push=args.push)
+                  budget=args.budget or config["phase_budget_usd"], dry_run=args.dry_run,
+                  push=args.push, merge=args.merge)
         code = run.execute()
         if code != 0:
             break
@@ -1451,6 +1500,8 @@ def main(argv: list[str] | None = None) -> int:
     pick.add_argument("--all", action="store_true")
     run.add_argument("--dry-run", action="store_true")
     run.add_argument("--push", action="store_true", help="push the adw branch when a phase is accepted")
+    run.add_argument("--merge", action="store_true",
+                     help="push the adw branch and squash-merge it into the repo when a phase is accepted")
     run.add_argument("--budget", type=float, default=None, help="USD cap per phase")
     run.add_argument("--allow-dirty", action="store_true")
     run.add_argument("--run-id", default=None)

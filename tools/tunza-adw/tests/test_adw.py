@@ -159,6 +159,16 @@ def test_forbidden_commands(repo, cmd):
     assert mod.forbidden(cmd)
 
 
+def test_landing_waits_until_asked_and_refuses_the_default_branch(repo):
+    _, mod = repo
+    assert mod.land_plan("adw/note", "main", False, False) == []
+    assert mod.land_plan("adw/note", "main", True, False) == ["push adw/note"]
+    assert mod.land_plan("adw/note", "main", False, True) == [
+        "push adw/note", "pr adw/note into main", "squash-merge adw/note"]
+    with pytest.raises(RuntimeError):
+        mod.publish_ref("main", "main")
+
+
 def test_gate_needs_all_five_signed_fields(repo):
     root, mod = repo
     assert mod.gate_state()[0] == "blocked"

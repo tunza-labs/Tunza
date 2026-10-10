@@ -120,6 +120,7 @@ pre.log { margin: 8px 0 0; max-height: 260px; overflow: auto; font: 11.5px/1.45 
       <div class="row" style="margin-top:8px">
         <label class="chk"><input type="checkbox" id="dry"> Dry run</label>
         <label class="chk"><input type="checkbox" id="push"> Push when accepted</label>
+        <label class="chk"><input type="checkbox" id="merge"> Merge when accepted</label>
       </div>
       <div class="sub" id="run-state" style="margin-top:6px">idle</div>
     </div>
@@ -375,7 +376,7 @@ pre.log { margin: 8px 0 0; max-height: 260px; overflow: auto; font: 11.5px/1.45 
   $("agent").addEventListener("change", function (ev) { if (ev.target.id === "follow") { ui.follow = ev.target.checked; render(); } });
   $("run-pick").addEventListener("change", function () { ui.pinnedRun = this.value; pollRuns().then(pollTrace); });
   function start(mode) {
-    var body = { mode: mode, phase: Number($("phase-pick").value), dry_run: $("dry").checked, push: $("push").checked };
+    var body = { mode: mode, phase: Number($("phase-pick").value), dry_run: $("dry").checked, push: $("push").checked, merge: $("merge").checked };
     ui.pinnedRun = ""; ui.follow = true;
     getJSON("/api/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
       .then(function () { setTimeout(pollRuns, 1500); pollState(); }).catch(function (e) { alert(e.message); });

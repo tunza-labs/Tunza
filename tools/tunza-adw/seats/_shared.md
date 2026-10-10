@@ -28,4 +28,11 @@ output, so a false claim fails the run.
    `app/api/triage/*`, or the frozen eval fixtures.
 6. Evidence is command output or a file and line you read. "Should work" is not
    evidence. If you did not run it, say so.
-7. Plain language. Every `summary` is 1–3 sentences.
+7. When you write something Evan will read, write it like `briefs/for-evan.md`.
+   Plain English. One short piece. Say what changed, then the one next step.
+   No file lists. No code names as the story. Do not hand him an agent caution
+   memo and call it the answer. If the honest answer is that it is not built
+   yet, say that in a sentence he can read. A `summary` is still 1–3 sentences.
+8. Required read: `briefs/for-evan.md`. Write what Evan reads that way.
+   Tunza is not clinically validated. The note is not proof, owned weights,
+   or a training license.
