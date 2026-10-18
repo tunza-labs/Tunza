@@ -71,6 +71,8 @@ def test_dedication_low_use_and_full_use():
     assert live.dedication({"ok": True, "util": 40, "apps": []}, {"pid": 1})["tone"] == "warn"
     assert live.dedication({"ok": True, "util": 90, "apps": []}, {"pid": 1})["tone"] == "ok"
     assert live.dedication({"ok": True, "util": 0, "apps": []}, None)["tone"] == "idle"
+    busy = live.dedication({"ok": True, "util": 88, "apps": [{"pid": 5, "name": "llama-server.exe"}]}, None)
+    assert busy["tone"] == "warn" and "llama-server.exe" in busy["text"]
 
 
 def test_parse_typeperf_reads_one_sample():

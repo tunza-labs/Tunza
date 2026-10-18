@@ -278,6 +278,10 @@ def dedication(gpu: dict, active: dict | None) -> dict:
     if not gpu.get("ok"):
         return {"tone": "bad", "text": "GPU cannot be read: " + gpu.get("error", "unknown")}
     if not active:
+        names = ", ".join(f'{x["name"]} ({x["pid"]})' for x in gpu.get("apps", [])[:4])
+        if names or (gpu.get("util") or 0) >= 20:
+            busy = "" if gpu.get("util") is None else f" ({gpu['util']:.0f}% busy)"
+            return {"tone": "warn", "text": f"Nothing is training, but the GPU is in use{busy}" + (": " + names if names else "")}
         return {"tone": "idle", "text": "Nothing is training. The card is idle."}
     others = [a for a in gpu.get("apps", []) if active.get("pid") and a["pid"] != active["pid"]]
     util = gpu.get("util")
