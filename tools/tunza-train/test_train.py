@@ -68,9 +68,8 @@ def test_only_the_answer_is_learned():
 
 
 def test_queue_skips_runs_that_already_have_results(tmp_path):
-    import queue as _q  # noqa: F401  (stdlib name; load ours by path)
     import importlib.util
-    spec = importlib.util.spec_from_file_location("tunza_queue", Path(__file__).parent / "queue.py")
+    spec = importlib.util.spec_from_file_location("tunza_queue", Path(__file__).parent / "run_queue.py")
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     (tmp_path / "sft-0.8b-s1").mkdir()

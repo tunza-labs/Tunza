@@ -3,7 +3,7 @@
 
 Re-running the same command after a crash or restart picks up with the first run that is not finished.
 
-  python tools/tunza-train/queue.py --methods sft sft_cost --seeds 1 2 --steps 80
+  python tools/tunza-train/run_queue.py --methods sft sft_cost --seeds 1 2 --steps 80
 """
 from __future__ import annotations
 
