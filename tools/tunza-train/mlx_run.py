@@ -91,6 +91,11 @@ def main() -> int:
         for line in proc.stdout:
             log.write(line)
             log.flush()
+            if re.match(r"^\s*\d+\s+nan\b", ANSI.sub("", line)):
+                proc.terminate()
+                meta["failed"], meta["note"] = True, "loss became nan; stopped. Lower --lr or raise --batch."
+                (out / "meta.json").write_text(json.dumps(meta, indent=2))
+                return 2
             rep = parse_report(line)
             if rep:
                 rep.update({"total_steps": a.iters, "elapsed_s": time.time() - start, "examples_seen": rep["step"] * a.batch})
