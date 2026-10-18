@@ -13,6 +13,8 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+# Preference methods run two answers per case, so they use a smaller batch on an 8 GB card, and a gentler learning rate.
+EXTRA = {"orpo": ["--batch", "2", "--accum", "8", "--lr", "1e-4"], "dpo": ["--batch", "2", "--accum", "8", "--lr", "5e-5"]}
 
 
 def plan(methods, seeds, size, steps, runs):
@@ -39,9 +41,10 @@ def main() -> int:
             print(f"skip {job['tag']} (already has results)", flush=True)
             continue
         print(f"start {job['tag']}", flush=True)
+        extra = EXTRA.get(job["method"], [])
         with open(f"{job['tag']}.out.txt", "w") as out, open(f"{job['tag']}.err.txt", "w") as err:
             code = subprocess.call([sys.executable, str(HERE / "train.py"), "--method", job["method"], "--model", a.model, "--runs", a.runs,
-                                    "--tag", job["tag"], "--steps", str(job["steps"]), "--seed", str(job["seed"])], stdout=out, stderr=err)
+                                    "--tag", job["tag"], "--steps", str(job["steps"]), "--seed", str(job["seed"]), *extra], stdout=out, stderr=err)
         print(f"finish {job['tag']} exit {code}", flush=True)
     return 0
 

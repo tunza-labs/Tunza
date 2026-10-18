@@ -26,7 +26,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-METHODS = ("ce", "pair", "list", "rl", "hybrid", "cost", "sft_rl", "dpo", "rft")
+METHODS = ("sft", "sft_cost", "rft", "dpo", "kto", "orpo", "grpo", "gspo", "sft_grpo")
 SEEDS = (0, 1, 2)
 TARGET_LOW, TARGET_HIGH = 85, 92  # full-use band for GPU busy percent, same as tunza-adw
 STALE_SECONDS = 120
@@ -440,7 +440,7 @@ if(t-swapT>4&&RECENT.length){cur=(cur+1)%RECENT.length;swapT=t;showEx()}}
 ctl.update();comp.render();requestAnimationFrame(frame)}
 const OPTS=['go_now','get_care_today','need_one_more_answer','monitor_at_home'];
 function PU(ex){return ex&&ex.probs?(ex.probs[ex.danger==null?0:ex.danger]||0):0}
-const COLORS={ce:'#7aa2ff',pair:'#b48cff',list:'#4fd1c5',rl:'#ff8a5c',hybrid:'#ffd166',cost:'#ff5c8a',sft_rl:'#a3e635',dpo:'#38bdf8',rft:'#f0abfc'};
+const COLORS={sft:'#7aa2ff',sft_cost:'#ff5c8a',rft:'#f0abfc',dpo:'#38bdf8',kto:'#4fd1c5',orpo:'#ffd166',grpo:'#ff8a5c',gspo:'#b48cff',sft_grpo:'#a3e635'};
 const $=id=>document.getElementById(id);
 function mk(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e}
 function showEx(){const ex=RECENT[cur%RECENT.length];if(!ex)return;let txt=ex.text;try{const o=JSON.parse(ex.text);txt=typeof o==='string'?o:(o.request||JSON.stringify(o))}catch(e){}
