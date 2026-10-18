@@ -164,6 +164,7 @@ def grpo_phase(model, tok, rows, a, out, tele, step0, device, pad, im_end, cuda,
             for c, r in group:
                 samples.append((pids, c, 0.0 if std < 1e-6 else (r - mean) / (std + 1e-4)))
         if cuda:
+            torch.cuda.empty_cache()
             FastLM.for_training(model)
         model.train()
         opt.zero_grad(set_to_none=True)
@@ -338,6 +339,7 @@ def main() -> int:
                     finally:
                         try:
                             if cuda:
+                                torch.cuda.empty_cache()  # give the probe's memory back so the card does not spill into system RAM
                                 FastLanguageModel.for_training(model)
                             model.train()
                         except Exception as exc:

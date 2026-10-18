@@ -14,7 +14,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 # Preference methods run two answers per case, so they use a smaller batch on an 8 GB card, and a gentler learning rate.
-EXTRA = {"orpo": ["--batch", "2", "--accum", "8", "--lr", "1e-4"], "dpo": ["--batch", "2", "--accum", "8", "--lr", "5e-5"]}
+EXTRA = {"orpo": ["--batch", "1", "--accum", "16", "--lr", "1e-4"], "dpo": ["--batch", "1", "--accum", "16", "--lr", "5e-5"]}
 
 
 def plan(methods, seeds, size, steps, runs):
