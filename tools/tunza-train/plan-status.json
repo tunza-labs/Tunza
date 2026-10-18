@@ -3,7 +3,7 @@
     {
       "name": "Phase 0: Understand Tunza and settle the shape",
       "status": "running",
-      "done": 4,
+      "done": 5,
       "total": 15
     },
     {
@@ -16,16 +16,16 @@
       "name": "Phase 2: Data (Hermes on Grok 4.7, sealed test first)",
       "status": "idle",
       "done": 0,
-      "total": 10
+      "total": 11
     },
     {
-      "name": "Phase 3: Nine LoRA methods on Kev-0.8B",
+      "name": "Phase 3: Nine LoRA methods on Qwen3.5-0.8B (PC)",
       "status": "idle",
       "done": 0,
       "total": 16
     },
     {
-      "name": "Phase 4: Winner on Kev-4B, sealed test, Jev column",
+      "name": "Phase 4: Winner at 2B on the PC and 4B on Jacob's, sealed test, Jev column",
       "status": "idle",
       "done": 0,
       "total": 7

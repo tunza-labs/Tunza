@@ -364,6 +364,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font:14px/1.
 <div id=inp class=glass><div class=lab>Example being read</div><div id=txt>waiting for the first example</div></div></div>
 <div id=right><div id=hw class=glass><div class=lab>This PC</div><div id=hwb>loading</div><div id=ded></div></div>
 <div id=out class=glass><div class=lab>Model answer</div><div id=opts></div><div id=verdict style="font-weight:650;margin-top:6px"></div></div></div>
+<div id=prev style="position:fixed;left:50%;bottom:262px;transform:translateX(-50%);color:var(--mut);font-size:12px;display:none;pointer-events:none;background:var(--glass);border:1px solid var(--edge);border-radius:8px;padding:4px 10px">Layout preview of the 24 layers. It lights up with real data when step 3 is logged.</div>
 <div id=empty><div style="font-size:18px;color:var(--fg)">No training run has started</div><div>The page fills in as soon as a run writes its first step.</div></div>
 <div id=bot class=glass><div id=grid></div><div id=curv><div class=lab>Loss by method</div><svg id=loss viewBox="0 0 400 100" preserveAspectRatio=none></svg><div id=leg></div></div>
 <div id=kp><div><div class=k id=k_loss>-</div><div class=m2>loss</div></div><div><div class=k id=k_step>-</div><div class=m2>step</div></div><div><div class=k id=k_tok>-</div><div class=m2>tokens per second</div></div></div></div>
@@ -450,7 +451,12 @@ const bar=mk('div','pbar'),f=mk('i');f.style.width=(p*100)+'%';f.style.backgroun
 const dz=ex.danger==null?0:ex.danger,v=$('verdict');
 if(ex.label===dz&&best!==dz){v.textContent='MISSED DANGER · true answer: '+names[ex.label];v.style.color='var(--bad)'}
 else{const ok=best===ex.label;v.textContent=(ok?'correct':'wrong')+' · true answer: '+names[ex.label];v.style.color=ok?'var(--ok)':'var(--warn)'}}
-async function nets(){try{const d=await (await fetch('/layers')).json();L=d.rows||[];const first=!RECENT.length;RECENT=d.recent||[];if(built)ingest();if(first&&RECENT.length)showEx()}catch(e){}}
+let PLACEHOLDER=false;
+function previewRows(){const mods=['q_proj','v_proj','in_proj_qkv','out_proj','gate_proj','down_proj'],r=[];for(let l=0;l<24;l++)mods.forEach(m=>r.push({layer:l,mod:m,rel_change:0.02,grad:0.12}));r.push({layer:-1,mod:'q',rel_change:0.02,grad:0.12},{layer:-1,mod:'k',rel_change:0.02,grad:0.12});return r}
+async function nets(){try{const d=await (await fetch('/layers')).json();const rows=d.rows||[];
+if(rows.length){L=rows;PLACEHOLDER=false}else if(!built){L=previewRows();PLACEHOLDER=true}
+$('prev').style.display=PLACEHOLDER?'block':'none';
+const first=!RECENT.length;RECENT=d.recent||[];if(built)ingest();if(first&&RECENT.length)showEx()}catch(e){}}
 function gauge(label,pct,right,band){const g=mk('div','g'),t=mk('div','t'),a=mk('span',null,label),b=mk('span',null,right);t.append(a,b);
 const bar=mk('div','pbar'),f=mk('i');f.style.width=Math.max(0,Math.min(100,pct||0))+'%';bar.append(f);
 if(band){const u=mk('u');u.style.left=band[0]+'%';u.style.width=(band[1]-band[0])+'%';bar.append(u)}g.append(t,bar);return g}
