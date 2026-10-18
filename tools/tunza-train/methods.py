@@ -55,7 +55,7 @@ def dpo_loss(lp_c, lp_r, ref_c, ref_r, n_c, torch, beta: float = 0.1, nll_weight
     return (-torch.nn.functional.logsigmoid(margin) + nll_weight * (-(lp_c / n_c))).mean()
 
 
-def rl_gate(runs: Path, method: str, seed: int) -> tuple[bool, str]:
+def rl_gate(runs: Path, method: str, seed: int, prefix: str = "") -> tuple[bool, str]:
     """T7: block reinforcement learning from the untuned model when always-go_now beats it. sft_grpo needs a finished SFT run that beats go_now."""
     def load(tag):
         p = Path(runs) / tag / "results.json"
@@ -69,9 +69,9 @@ def rl_gate(runs: Path, method: str, seed: int) -> tuple[bool, str]:
         if base["mean_reward"] <= go_now:
             return False, f"T7: untuned model scores {base['mean_reward']:.3f}, not above always-go_now {go_now:.3f}; RL from base is blocked"
         return True, "T7 passed"
-    sft = load(f"sft-0.8b-s{seed}")
+    sft = load(f"{prefix}sft-0.8b-s{seed}")
     if sft is None:
-        return False, f"no finished sft-0.8b-s{seed} to start RL from"
+        return False, f"no finished {prefix}sft-0.8b-s{seed} to start RL from"
     go_now = sft["constant_baselines"]["go_now"]
     if sft["mean_reward"] <= go_now:
         return False, f"SFT checkpoint scores {sft['mean_reward']:.3f}, not above always-go_now {go_now:.3f}"

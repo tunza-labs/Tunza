@@ -215,6 +215,7 @@ def main() -> int:
     ap.add_argument("--grpo_steps", type=int, default=40)
     ap.add_argument("--grpo_lr", type=float, default=1e-5)
     ap.add_argument("--group", type=int, default=6)
+    ap.add_argument("--sealed", default=None, help="also score this sealed test file after training (slow; use for finalists)")
     ap.add_argument("--no_probe", action="store_true", help="skip the live example probe on the page")
     a = ap.parse_args()
 
@@ -229,7 +230,7 @@ def main() -> int:
     (out / "meta.json").write_text(json.dumps(meta, indent=2))
 
     if a.method == "sft_grpo":
-        ok, why = mt.rl_gate(Path(a.runs), a.method, a.seed)
+        ok, why = mt.rl_gate(Path(a.runs), a.method, a.seed, prefix=tag[:tag.index(a.method)] if a.method in tag else "")
         meta["rl_gate"] = why
         (out / "meta.json").write_text(json.dumps(meta, indent=2))
         if not ok:
@@ -365,6 +366,12 @@ def main() -> int:
 
     result = ev.evaluate(dev_rows, generate)
     result["constant_baselines"] = ev.constant_baselines(dev_rows)
+    if a.sealed:
+        sealed_rows = ev.read_rows(Path(a.sealed))
+        sealed = ev.evaluate(sealed_rows, generate)
+        sealed.pop("rows", None)
+        sealed["constant_baselines"] = ev.constant_baselines(sealed_rows)
+        result["sealed"] = sealed
     result["train_seconds"] = time.time() - start
     result.update({"method": a.method, "seed": a.seed, "model": a.model})
     (out / "results.json").write_text(json.dumps(result, indent=2))

@@ -1,0 +1,140 @@
+{
+  "schema_version": 2,
+  "generator": "tools/tunza-train/gen_cases.py",
+  "generator_sha256": "bb5bc37174ec78d20e8eca2e4aa9d1b2804c5248285feaf9f5bbc8c6d8261863",
+  "command": "python3 tools/tunza-train/gen_cases.py --seed 20261018 --out tools/tunza-train/data/v2",
+  "seed": 20261018,
+  "jev_derived": false,
+  "clinical_data": false,
+  "model_written_text": false,
+  "label_source": "decide() in lib/assessment.ts",
+  "assessment_ts_sha256": "e9a2cdeaed47f534d16163063b1c159b4040fc7eba07deed655c1d247921df87",
+  "decide_bundle_sha256": "42080bf9e185339b75f65ba3eae00dafcf5b664edfc29cc072b29033f85da2e0",
+  "esbuild_version": "0.28.2",
+  "dev_file_checked_against": {
+    "path": "data/triage-dev.jsonl",
+    "sha256": "0f6185e48746eb284dababb4b7ca88931eacd80878ebf988aac25aa4fad917db"
+  },
+  "v1_train_checked_against": {
+    "path": "data/triage-train.jsonl",
+    "sha256": "f4e3222e48da6309d508e1a9def16b22f110dfc0712811584b1c96e668af8bee"
+  },
+  "files": {
+    "triage-train.jsonl": {
+      "rows": 3000,
+      "sha256": "c93ab38d9b06a10da5efbe027f04f7b943fa9de75522a26af2f9dba0cbc04fe9",
+      "distinct_stories_nonblank": 2918,
+      "distinct_normalised_presentations_including_blank": 2919,
+      "blank_story_rows": 82,
+      "by_language_and_disposition": {
+        "en": {
+          "monitor_at_home": 250,
+          "get_care_today": 240,
+          "go_now": 330,
+          "need_one_more_answer": 180
+        },
+        "sw": {
+          "need_one_more_answer": 180,
+          "go_now": 330,
+          "get_care_today": 240,
+          "monitor_at_home": 250
+        },
+        "cs": {
+          "go_now": 330,
+          "need_one_more_answer": 180,
+          "get_care_today": 240,
+          "monitor_at_home": 250
+        }
+      },
+      "by_disposition": {
+        "go_now": 990,
+        "need_one_more_answer": 540,
+        "monitor_at_home": 750,
+        "get_care_today": 720
+      },
+      "by_language": {
+        "cs": 1000,
+        "sw": 1000,
+        "en": 1000
+      }
+    },
+    "triage-sealed.jsonl": {
+      "rows": 450,
+      "sha256": "e910ae0b590da7051c3da6e44cb9eb729909abcf591bbcb7f348fbe2f5dc46ed",
+      "distinct_stories_nonblank": 442,
+      "distinct_normalised_presentations_including_blank": 443,
+      "blank_story_rows": 8,
+      "by_language_and_disposition": {
+        "en": {
+          "go_now": 50,
+          "get_care_today": 34,
+          "monitor_at_home": 34,
+          "need_one_more_answer": 32
+        },
+        "sw": {
+          "go_now": 50,
+          "monitor_at_home": 34,
+          "need_one_more_answer": 32,
+          "get_care_today": 34
+        },
+        "cs": {
+          "go_now": 50,
+          "get_care_today": 34,
+          "monitor_at_home": 34,
+          "need_one_more_answer": 32
+        }
+      },
+      "by_disposition": {
+        "go_now": 150,
+        "monitor_at_home": 102,
+        "need_one_more_answer": 96,
+        "get_care_today": 102
+      },
+      "by_language": {
+        "cs": 150,
+        "sw": 150,
+        "en": 150
+      }
+    }
+  },
+  "families_sidecar": {
+    "path": "families.json",
+    "sha256": "a38dfcdec6bdd0b07b768b218fd0c2685f6d56e6b6e74de5c12cf016389df0fd"
+  },
+  "leakage_checks": {
+    "family_overlap_train_vs_sealed": {
+      "shape": 0,
+      "subj": 0,
+      "sym": 0,
+      "frames": 0
+    },
+    "shingle_size": 5,
+    "jaccard_threshold": 0.8,
+    "blank_stories": "exempt from shared-text checks (no text to leak); capped per language"
+  },
+  "generation_drops": {
+    "dropped_bin_full": 2488,
+    "dropped_blank_cap": 10,
+    "dropped_duplicate_row": 3,
+    "dropped_duplicate_story": 45,
+    "dropped_shared_text": 4
+  },
+  "quotas_per_language": {
+    "train": {
+      "go_now": 330,
+      "get_care_today": 240,
+      "monitor_at_home": 250,
+      "need_one_more_answer": 180
+    },
+    "sealed": {
+      "go_now": 50,
+      "get_care_today": 34,
+      "monitor_at_home": 34,
+      "need_one_more_answer": 32
+    }
+  },
+  "dispositions_absent": [
+    "escalate",
+    "abstain"
+  ]
+}
