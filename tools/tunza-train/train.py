@@ -216,6 +216,7 @@ def main() -> int:
     ap.add_argument("--grpo_lr", type=float, default=1e-5)
     ap.add_argument("--group", type=int, default=6)
     ap.add_argument("--sealed", default=None, help="also score this sealed test file after training (slow; use for finalists)")
+    ap.add_argument("--grad_ckpt", action="store_true", help="trade speed for memory on the Apple Silicon path (8 GB Macs)")
     ap.add_argument("--no_probe", action="store_true", help="skip the live example probe on the page")
     a = ap.parse_args()
 
@@ -254,6 +255,9 @@ def main() -> int:
         mps = torch.backends.mps.is_available()
         tok = AutoTokenizer.from_pretrained(a.model)
         model = AutoModelForCausalLM.from_pretrained(a.model, torch_dtype=torch.bfloat16 if mps else torch.float32)
+        if a.grad_ckpt:
+            model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
+            model.enable_input_require_grads()
         if a.method != "base":
             model = get_peft_model(model, LoraConfig(r=a.rank, lora_alpha=a.rank * 2, target_modules=TARGETS, task_type="CAUSAL_LM"))
         if mps:
