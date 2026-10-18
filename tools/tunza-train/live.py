@@ -181,6 +181,60 @@ def _run(cmd: list[str]) -> tuple[int, str]:
     return p.returncode, (p.stdout or "") + (p.stderr or "")
 
 
+def parse_typeperf(text: str) -> dict[str, float]:
+    """typeperf CSV with one sample: first row names the counters, last row has the values."""
+    import csv
+    rows = [r for r in csv.reader(text.splitlines()) if r]
+    if len(rows) < 2:
+        return {}
+    names, vals = rows[0], rows[-1]
+    out: dict[str, float] = {}
+    for n, v in zip(names[1:], vals[1:]):
+        try:
+            out[n] = float(v)
+        except ValueError:
+            continue
+    return out
+
+
+def windows_gpu_info(error: str) -> dict | None:
+    """When NVML is broken, read the card through the CUDA driver and Windows counters instead."""
+    if os.name != "nt":
+        return None
+    try:
+        cuda = ctypes.WinDLL("nvcuda.dll")
+        if cuda.cuInit(0) != 0:
+            return None
+        name = ctypes.create_string_buffer(100)
+        total = ctypes.c_size_t()
+        if cuda.cuDeviceGetName(name, 100, 0) != 0 or cuda.cuDeviceTotalMem_v2(ctypes.byref(total), 0) != 0:
+            return None
+        eng = parse_typeperf(_run(["typeperf", r"\GPU Engine(*)\Utilization Percentage", "-sc", "1"])[1])
+        mem = parse_typeperf(_run(["typeperf", r"\GPU Adapter Memory(*)\Dedicated Usage", "-sc", "1"])[1])
+        by_type: dict[str, float] = {}
+        by_pid: dict[int, float] = {}
+        for key, val in eng.items():
+            m = re.search(r"pid_(\d+).*engtype_([A-Za-z0-9_]+)", key)
+            if not m:
+                continue
+            by_type[m.group(2)] = by_type.get(m.group(2), 0.0) + val
+            by_pid[int(m.group(1))] = by_pid.get(int(m.group(1)), 0.0) + val
+        used = max(mem.values()) if mem else None
+        apps = []
+        for pid, util in sorted(by_pid.items(), key=lambda kv: -kv[1])[:4]:
+            if util >= 0.5:
+                rc, out = _run(["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"])
+                nm = out.split('","')[0].strip('"') if rc == 0 and out.startswith('"') else f"pid {pid}"
+                apps.append({"pid": pid, "name": nm, "mem_mb": None})
+        return {"ok": True, "source": "windows", "name": name.value.decode(errors="replace"),
+                "util": min(100.0, max(by_type.values())) if by_type else None,
+                "mem_used_mb": round(used / 2**20) if used is not None else None,
+                "mem_total_mb": round(total.value / 2**20), "power_w": None, "temp_c": None,
+                "driver": "nvidia-smi unavailable (" + error[:60] + ")", "apps": apps}
+    except Exception:
+        return None
+
+
 def gpu_info() -> dict:
     now = time.time()
     if _GPU_CACHE["v"] is not None and now - _GPU_CACHE["t"] < 2:
@@ -208,6 +262,10 @@ def gpu_info() -> dict:
         out = {"ok": False, "error": "nvidia-smi not found on this machine"}
     except Exception as exc:  # timeout or driver fault: show it, do not guess
         out = {"ok": False, "error": f"{type(exc).__name__}: {exc}"[:300]}
+    if not out.get("ok"):
+        alt = windows_gpu_info(out.get("error", ""))
+        if alt:
+            out = alt
     _GPU_CACHE.update(t=now, v=out)
     return out
 

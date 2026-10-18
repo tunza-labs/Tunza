@@ -71,3 +71,17 @@ def test_dedication_low_use_and_full_use():
     assert live.dedication({"ok": True, "util": 40, "apps": []}, {"pid": 1})["tone"] == "warn"
     assert live.dedication({"ok": True, "util": 90, "apps": []}, {"pid": 1})["tone"] == "ok"
     assert live.dedication({"ok": True, "util": 0, "apps": []}, None)["tone"] == "idle"
+
+
+def test_parse_typeperf_reads_one_sample():
+    head = ('"(PDH-CSV 4.0)",'
+            '"\\\\H\\GPU Engine(pid_12_luid_0x0_0x1_phys_0_eng_0_engtype_3D)\\Utilization Percentage",'
+            '"\\\\H\\GPU Engine(pid_12_luid_0x0_0x1_phys_0_eng_1_engtype_Compute_0)\\Utilization Percentage"')
+    row = '"10/18/2026 00:00:00.1","12.5","80.25"'
+    got = live.parse_typeperf(head + "\n" + row + "\n")
+    assert sorted(got.values()) == [12.5, 80.25]
+
+
+def test_windows_fallback_is_off_the_windows_path():
+    if live.os.name != "nt":
+        assert live.windows_gpu_info("x") is None
