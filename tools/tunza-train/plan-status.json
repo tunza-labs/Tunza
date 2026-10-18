@@ -1,0 +1,46 @@
+{
+  "phases": [
+    {
+      "name": "Phase 0: Understand Tunza and settle the shape",
+      "status": "idle",
+      "done": 0,
+      "total": 12
+    },
+    {
+      "name": "Phase 1: Baselines with no training",
+      "status": "idle",
+      "done": 0,
+      "total": 7
+    },
+    {
+      "name": "Phase 2: Data (Hermes on Grok 4.7, sealed test first)",
+      "status": "idle",
+      "done": 0,
+      "total": 10
+    },
+    {
+      "name": "Phase 3: Nine LoRA methods on Kev-0.8B",
+      "status": "idle",
+      "done": 0,
+      "total": 16
+    },
+    {
+      "name": "Phase 4: Winner on Kev-4B, sealed test, Jev column",
+      "status": "idle",
+      "done": 0,
+      "total": 7
+    },
+    {
+      "name": "Phase 5: Full-weight fine-tune",
+      "status": "idle",
+      "done": 0,
+      "total": 5
+    },
+    {
+      "name": "Phase 6: Report and file",
+      "status": "idle",
+      "done": 0,
+      "total": 8
+    }
+  ]
+}
