@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "source": "tunza-sft-v1.1 triage rows",
+  "label_source": "Tunza decide() rules (lib/assessment.ts), not a model",
+  "jev_derived": false,
+  "clinical_data": false,
+  "files": {
+    "triage-train.jsonl": {
+      "rows": 300,
+      "sha256": "f4e3222e48da6309d508e1a9def16b22f110dfc0712811584b1c96e668af8bee"
+    },
+    "triage-dev.jsonl": {
+      "rows": 96,
+      "sha256": "0f6185e48746eb284dababb4b7ca88931eacd80878ebf988aac25aa4fad917db"
+    }
+  },
+  "note": "dev is the development slice for choosing methods. The sealed test is built separately and never lives in this folder."
+}
