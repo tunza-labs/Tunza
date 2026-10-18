@@ -103,6 +103,9 @@ def test_mlx_progress_lines_are_parsed():
     rep = mod.parse_report(line)
     assert rep["step"] == 10 and rep["loss"] == 0.987 and rep["gpu_mem_gb"] == 3.214
     assert mod.parse_report("Loading model") is None
+    tab = mod.parse_report("\x1b[38;5;244m   4\x1b[0m    1.407 \u25b2        1      0.0k")
+    assert tab["step"] == 4 and tab["loss"] == 1.407
+    assert mod.parse_report("     1    val 1.306    42.86s") is None
     assert mod.clean_answer("<think>\n\n</think>\n\n{\"disposition\":\"go_now\"}") == '{"disposition":"go_now"}'
     row = ev.read_rows(DEV)[0]
     msgs = mod.to_messages(row)["messages"]

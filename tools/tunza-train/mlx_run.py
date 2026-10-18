@@ -24,6 +24,10 @@ import evaluate as ev  # noqa: E402
 REPORT = re.compile(r"Iter (\d+): Train loss ([0-9.]+), Learning Rate ([0-9.e+-]+), It/sec ([0-9.]+), Tokens/sec ([0-9.]+), Trained Tokens (\d+), Peak mem ([0-9.]+) GB")
 
 
+ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+TABLE = re.compile(r"^\s*(\d+)\s+([0-9.]+)\s*[▲▼=]?\s+(\d+)\s+([0-9.]+)k\s*$")
+
+
 def to_messages(row: dict) -> dict:
     """One training row in mlx-lm chat format: the same prompt as every other method, and the JSON answer."""
     return {"messages": [{"role": "user", "content": ev.make_prompt(row["intake"])},
@@ -37,7 +41,11 @@ def write_split(path: Path, rows: list[dict]) -> None:
 def parse_report(line: str) -> dict | None:
     m = REPORT.search(line)
     if not m:
-        return None
+        t = TABLE.match(ANSI.sub("", line).strip("\r\n "))
+        if not t:
+            return None
+        return {"step": int(t[1]), "loss": float(t[2]), "lr": 0.0, "it_per_s": 0.0, "tok_per_s": float(t[3]),
+                "tokens_seen": int(float(t[4]) * 1000), "gpu_mem_gb": 0.0}
     return {"step": int(m[1]), "loss": float(m[2]), "lr": float(m[3]), "it_per_s": float(m[4]), "tok_per_s": float(m[5]),
             "tokens_seen": int(m[6]), "gpu_mem_gb": float(m[7])}
 
