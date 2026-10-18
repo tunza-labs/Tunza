@@ -2,9 +2,9 @@
   "phases": [
     {
       "name": "Phase 0: Understand Tunza and settle the shape",
-      "status": "idle",
-      "done": 0,
-      "total": 12
+      "status": "running",
+      "done": 4,
+      "total": 15
     },
     {
       "name": "Phase 1: Baselines with no training",
