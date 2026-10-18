@@ -303,7 +303,8 @@ def build_state(runs_dir: Path, plan: Path | None, now: float | None = None) -> 
     runs = []
     if runs_dir.is_dir():
         runs = [summarize_run(d, now) for d in sorted(runs_dir.iterdir()) if d.is_dir()]
-    active_runs = [r for r in runs if r["state"] == "running"]
+    # a run that has started (pid written) but not yet logged a step is loading the model: it is training too
+    active_runs = [r for r in runs if r["state"] == "running" or (r["state"] == "queued" and r.get("pid"))]
     newest = max(runs, key=lambda r: r["mtime"]) if runs else None
     current = max(active_runs, key=lambda r: r["mtime"]) if active_runs else newest
     gpu = gpu_info()
@@ -321,7 +322,7 @@ def build_state(runs_dir: Path, plan: Path | None, now: float | None = None) -> 
         "gpu": gpu,
         "ram": ram_info(),
         "disk_free_gb": free_gb,
-        "dedication": dedication(gpu, current if current and current["state"] == "running" else None),
+        "dedication": dedication(gpu, current if current and current in active_runs else None),
         "target": [TARGET_LOW, TARGET_HIGH],
     }
 

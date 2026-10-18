@@ -92,3 +92,11 @@ def test_windows_fallback_is_off_the_windows_path():
 def test_idle_but_memory_held_is_flagged():
     d = live.dedication({"ok": True, "util": 2, "mem_used_mb": 6680, "mem_total_mb": 8192, "apps": []}, None)
     assert d["tone"] == "warn" and "6.5 of 8.0 GB" in d["text"]
+
+
+def test_a_run_that_is_still_loading_counts_as_training(tmp_path):
+    d = tmp_path / "loading"
+    d.mkdir()
+    (d / "meta.json").write_text(json.dumps({"method": "sft", "seed": 0, "size": "0.8b", "total_steps": 20, "pid": 77}))
+    st = live.build_state(tmp_path, None)
+    assert st["runs"][0]["state"] == "queued" and st["current"] == "loading"
