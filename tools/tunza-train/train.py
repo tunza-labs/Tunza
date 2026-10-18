@@ -126,6 +126,7 @@ def main() -> int:
         model = AutoModelForCausalLM.from_pretrained(a.model, torch_dtype=torch.float32)
         if a.method != "base":
             model = get_peft_model(model, LoraConfig(r=a.rank, lora_alpha=a.rank * 2, target_modules=TARGETS, task_type="CAUSAL_LM"))
+    tok = getattr(tok, "tokenizer", tok)  # Qwen3.5 loads as a multimodal processor; the text tokenizer is inside
     device = next(model.parameters()).device
     im_end = tok.convert_tokens_to_ids("<|im_end|>")
     pad = tok.pad_token_id if tok.pad_token_id is not None else im_end
