@@ -76,3 +76,19 @@ def test_queue_skips_runs_that_already_have_results(tmp_path):
     (tmp_path / "sft-0.8b-s1" / "results.json").write_text("{}")
     jobs = mod.plan(["sft", "sft_cost"], [1, 2], "0.8b", 80, tmp_path)
     assert [(j["tag"], j["done"]) for j in jobs] == [("sft-0.8b-s1", True), ("sft_cost-0.8b-s1", False), ("sft-0.8b-s2", False), ("sft_cost-0.8b-s2", False)]
+
+
+def test_disposition_step_finds_where_the_value_starts():
+    pieces = ['{"', 'danger_facts', '":[', '],"', 'disposition', '":"', 'go', '_now']
+    assert train.disposition_step(pieces) == 6
+    assert train.disposition_step(['{"', 'oops']) is None
+
+
+def test_softmax_over_sums_to_one_and_keeps_order():
+    p = train.softmax_over([2.0, 0.0, -1.0])
+    assert abs(sum(p) - 1.0) < 1e-9 and p[0] > p[1] > p[2]
+
+
+def test_intake_text_puts_the_story_first():
+    txt = train.intake_text({"presentation": "she is not waking", "who": "child", "awake": "not_waking", "breathing": "unknown"})
+    assert txt.startswith("she is not waking") and "awake: not_waking" in txt

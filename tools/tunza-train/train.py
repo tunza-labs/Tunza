@@ -80,6 +80,50 @@ def layer_rows(model, grads: dict) -> list[dict]:
     return [{"layer": k[0], "mod": k[1], "rel_change": v["B"] / (v["A"] + 1e-8), "grad": v["g"]} for k, v in sorted(mods.items())]
 
 
+PROBE_OPTIONS = ["go_now", "get_care_today", "need_one_more_answer", "monitor_at_home", "escalate", "abstain"]
+
+
+def intake_text(intake: dict) -> str:
+    """Plain text for the live page: the story first, then the structured answers."""
+    facts = " · ".join(f"{k}: {intake[k]}" for k in ("who", "awake", "breathing", "drinking", "duration", "mainProblem") if intake.get(k))
+    return f"{intake.get('presentation', '')}\n{facts}".strip()
+
+
+def disposition_step(token_text_so_far: list[str]) -> int | None:
+    """Index of the generated token where the disposition value begins, found from the text written so far."""
+    running = ""
+    for i, piece in enumerate(token_text_so_far):
+        if running.replace(" ", "").endswith('"disposition":"'):
+            return i
+        running += piece
+    return None
+
+
+def softmax_over(logits: list[float]) -> list[float]:
+    m = max(logits)
+    exps = [math.exp(x - m) for x in logits]
+    total = sum(exps)
+    return [e / total for e in exps]
+
+
+def probe_example(model, tok, row: dict, device, pad: int, im_end: int, cuda: bool, torch):
+    """Run the model on one example and read its own probabilities for each disposition at the moment it writes it."""
+    ids = torch.tensor([chat_prompt_ids(tok, ev.make_prompt(row["intake"]))], device=device)
+    with torch.no_grad():
+        out = model.generate(input_ids=ids, max_new_tokens=70, do_sample=False, output_scores=True, return_dict_in_generate=True,
+                             eos_token_id=[im_end, tok.eos_token_id], pad_token_id=pad)
+    gen = out.sequences[0, ids.shape[1]:].tolist()
+    pieces = [tok.decode([t]) for t in gen]
+    at = disposition_step(pieces)
+    if at is None or at >= len(out.scores):
+        return None
+    first_ids = [tok(name, add_special_tokens=False)["input_ids"][0] for name in PROBE_OPTIONS]
+    row_logits = out.scores[at][0].float().cpu()
+    probs = softmax_over([float(row_logits[i]) for i in first_ids])
+    label = PROBE_OPTIONS.index(row["answer"]["disposition"])
+    return {"text": intake_text(row["intake"]), "probs": probs, "label": label, "danger": 0, "options": PROBE_OPTIONS}
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--method", choices=["base", "sft", "sft_cost"], required=True)
@@ -96,6 +140,7 @@ def main() -> int:
     ap.add_argument("--rank", type=int, default=16)
     ap.add_argument("--max_len", type=int, default=768)
     ap.add_argument("--max_new", type=int, default=100)
+    ap.add_argument("--no_probe", action="store_true", help="skip the live example probe on the page")
     a = ap.parse_args()
 
     size = (re.search(r"(\d+(?:\.\d+)?B)", a.model) or [None, "?"])[1].lower()
@@ -145,6 +190,7 @@ def main() -> int:
             FastLanguageModel.for_training(model)
         model.train()
         order, seen, tok_count = [], 0, 0
+        recent: list[dict] = []
         tele = (out / "telemetry.jsonl").open("a", buffering=1)
         for step in range(1, a.steps + 1):
             for g in opt.param_groups:
@@ -178,7 +224,26 @@ def main() -> int:
                                    "tok_per_s": tok_count / max(1e-9, elapsed), "examples_seen": seen, "elapsed_s": elapsed,
                                    "gpu_mem_gb": (torch.cuda.max_memory_allocated() / 2**30) if cuda else None}) + "\n")
             if step % 3 == 0 or step == a.steps:
-                (out / "layerstats.json.tmp").write_text(json.dumps({"step": step, "steps": a.steps, "loss": total_loss, "rows": layer_rows(model, grads), "recent": []}))
+                rows_now = layer_rows(model, grads)
+                if not a.no_probe:
+                    try:
+                        model.eval()
+                        if cuda:
+                            FastLanguageModel.for_inference(model)
+                        ex = probe_example(model, tok, dev_rows[(step // 3) % len(dev_rows)], device, pad, im_end, cuda, torch)
+                        if ex:
+                            recent = (recent + [ex])[-10:]
+                    except Exception as exc:  # the probe is for the page only; never stop training for it
+                        print("probe skipped:", repr(exc)[:200], flush=True)
+                    finally:
+                        try:
+                            if cuda:
+                                FastLanguageModel.for_training(model)
+                            model.train()
+                        except Exception as exc:
+                            print("could not return to training mode:", repr(exc)[:200], flush=True)
+                            raise
+                (out / "layerstats.json.tmp").write_text(json.dumps({"step": step, "steps": a.steps, "loss": total_loss, "rows": rows_now, "recent": recent}))
                 (out / "layerstats.json.tmp").replace(out / "layerstats.json")
         model.save_pretrained(out / "adapter")
         model.eval()
