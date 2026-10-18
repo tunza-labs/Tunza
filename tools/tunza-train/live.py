@@ -177,19 +177,22 @@ def _run(cmd: list[str]) -> tuple[int, str]:
     kw = {}
     if os.name == "nt":
         kw["creationflags"] = 0x08000000
-    p = subprocess.run(cmd, capture_output=True, text=True, timeout=5, **kw)
+    p = subprocess.run(cmd, capture_output=True, text=True, timeout=12, **kw)
     return p.returncode, (p.stdout or "") + (p.stderr or "")
 
 
 def parse_typeperf(text: str) -> dict[str, float]:
-    """typeperf CSV with one sample: first row names the counters, last row has the values."""
+    """typeperf CSV: a header row of counter names, then sample rows, then trailing status lines."""
     import csv
     rows = [r for r in csv.reader(text.splitlines()) if r]
-    if len(rows) < 2:
+    head = next((k for k, r in enumerate(rows) if r and r[0].startswith("(PDH-CSV")), None)
+    if head is None:
         return {}
-    names, vals = rows[0], rows[-1]
+    data = [r for r in rows[head + 1:] if len(r) > 1 and r[0][:1].isdigit()]
+    if not data:
+        return {}
     out: dict[str, float] = {}
-    for n, v in zip(names[1:], vals[1:]):
+    for n, v in zip(rows[head][1:], data[-1][1:]):
         try:
             out[n] = float(v)
         except ValueError:
@@ -209,7 +212,7 @@ def windows_gpu_info(error: str) -> dict | None:
         total = ctypes.c_size_t()
         if cuda.cuDeviceGetName(name, 100, 0) != 0 or cuda.cuDeviceTotalMem_v2(ctypes.byref(total), 0) != 0:
             return None
-        eng = parse_typeperf(_run(["typeperf", r"\GPU Engine(*)\Utilization Percentage", "-sc", "1"])[1])
+        eng = parse_typeperf(_run(["typeperf", r"\GPU Engine(*)\Utilization Percentage", "-sc", "2"])[1])
         mem = parse_typeperf(_run(["typeperf", r"\GPU Adapter Memory(*)\Dedicated Usage", "-sc", "1"])[1])
         by_type: dict[str, float] = {}
         by_pid: dict[int, float] = {}

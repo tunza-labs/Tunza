@@ -78,7 +78,7 @@ def test_parse_typeperf_reads_one_sample():
             '"\\\\H\\GPU Engine(pid_12_luid_0x0_0x1_phys_0_eng_0_engtype_3D)\\Utilization Percentage",'
             '"\\\\H\\GPU Engine(pid_12_luid_0x0_0x1_phys_0_eng_1_engtype_Compute_0)\\Utilization Percentage"')
     row = '"10/18/2026 00:00:00.1","12.5","80.25"'
-    got = live.parse_typeperf(head + "\n" + row + "\n")
+    got = live.parse_typeperf(head + "\n" + row + "\n\nExiting, please wait...\nThe command completed successfully.\n")
     assert sorted(got.values()) == [12.5, 80.25]
 
 
