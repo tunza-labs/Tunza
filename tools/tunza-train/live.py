@@ -238,9 +238,13 @@ def windows_gpu_info(error: str) -> dict | None:
         return None
 
 
+_BACKGROUND = {"on": False}
+
+
 def gpu_info() -> dict:
     now = time.time()
-    if _GPU_CACHE["v"] is not None and now - _GPU_CACHE["t"] < 2:
+    # with the background reader running, answer from its last reading so a request never waits on nvidia-smi or the Windows counters
+    if _GPU_CACHE["v"] is not None and (_BACKGROUND["on"] or now - _GPU_CACHE["t"] < 2):
         return _GPU_CACHE["v"]
     try:
         rc, text = _run(["nvidia-smi", "--query-gpu=name,utilization.gpu,memory.used,memory.total,power.draw,temperature.gpu,driver_version",
@@ -502,6 +506,20 @@ def main() -> int:
     ap.add_argument("--host", default="127.0.0.1")
     a = ap.parse_args()
     runs_dir, plan = Path(a.runs), Path(a.plan)
+
+    import threading
+
+    def reader():
+        while True:
+            _BACKGROUND["on"] = False
+            try:
+                gpu_info()
+            except Exception:
+                pass
+            _BACKGROUND["on"] = True
+            time.sleep(3)
+
+    threading.Thread(target=reader, daemon=True).start()
 
     class H(BaseHTTPRequestHandler):
         def do_GET(self):
