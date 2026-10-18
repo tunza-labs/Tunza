@@ -279,6 +279,9 @@ def dedication(gpu: dict, active: dict | None) -> dict:
         return {"tone": "bad", "text": "GPU cannot be read: " + gpu.get("error", "unknown")}
     if not active:
         names = ", ".join(f'{x["name"]} ({x["pid"]})' for x in gpu.get("apps", [])[:4])
+        used, tot = gpu.get("mem_used_mb"), gpu.get("mem_total_mb")
+        if used and tot and used / tot >= 0.25 and not names:
+            return {"tone": "warn", "text": f"Nothing is training, but {used / 1024:.1f} of {tot / 1024:.1f} GB of GPU memory is held by other programs"}
         if names or (gpu.get("util") or 0) >= 20:
             busy = "" if gpu.get("util") is None else f" ({gpu['util']:.0f}% busy)"
             return {"tone": "warn", "text": f"Nothing is training, but the GPU is in use{busy}" + (": " + names if names else "")}

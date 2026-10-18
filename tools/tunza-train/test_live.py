@@ -87,3 +87,8 @@ def test_parse_typeperf_reads_one_sample():
 def test_windows_fallback_is_off_the_windows_path():
     if live.os.name != "nt":
         assert live.windows_gpu_info("x") is None
+
+
+def test_idle_but_memory_held_is_flagged():
+    d = live.dedication({"ok": True, "util": 2, "mem_used_mb": 6680, "mem_total_mb": 8192, "apps": []}, None)
+    assert d["tone"] == "warn" and "6.5 of 8.0 GB" in d["text"]
