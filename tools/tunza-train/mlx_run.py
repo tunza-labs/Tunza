@@ -59,6 +59,8 @@ def main() -> int:
     ap.add_argument("--lr", type=float, default=1e-4)
     ap.add_argument("--max_len", type=int, default=512)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--num_layers", type=int, default=-1)
+    ap.add_argument("--report", type=int, default=5)
     a = ap.parse_args()
 
     out = Path(a.runs) / a.tag
@@ -72,8 +74,8 @@ def main() -> int:
     tele = (out / "telemetry.jsonl").open("a", buffering=1)
 
     cmd = [sys.executable, "-m", "mlx_lm", "lora", "--model", a.model, "--train", "--data", str(out / "mlxdata"), "--batch-size", str(a.batch),
-           "--iters", str(a.iters), "--learning-rate", str(a.lr), "--num-layers", "-1", "--mask-prompt", "--grad-checkpoint",
-           "--max-seq-length", str(a.max_len), "--adapter-path", str(out / "adapter"), "--steps-per-report", "5",
+           "--iters", str(a.iters), "--learning-rate", str(a.lr), "--num-layers", str(a.num_layers), "--mask-prompt", "--grad-checkpoint",
+           "--max-seq-length", str(a.max_len), "--adapter-path", str(out / "adapter"), "--steps-per-report", str(a.report),
            "--steps-per-eval", str(a.iters + 1), "--save-every", "100", "--seed", str(a.seed)]
     start = time.time()
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
