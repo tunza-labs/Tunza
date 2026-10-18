@@ -122,10 +122,14 @@ def main() -> int:
     else:
         from transformers import AutoModelForCausalLM, AutoTokenizer
         from peft import LoraConfig, get_peft_model
+        # Apple Silicon (MPS) path: no Unsloth, plain transformers and peft. CPU is the last resort.
+        mps = torch.backends.mps.is_available()
         tok = AutoTokenizer.from_pretrained(a.model)
-        model = AutoModelForCausalLM.from_pretrained(a.model, torch_dtype=torch.float32)
+        model = AutoModelForCausalLM.from_pretrained(a.model, torch_dtype=torch.bfloat16 if mps else torch.float32)
         if a.method != "base":
             model = get_peft_model(model, LoraConfig(r=a.rank, lora_alpha=a.rank * 2, target_modules=TARGETS, task_type="CAUSAL_LM"))
+        if mps:
+            model = model.to("mps")
     tok = getattr(tok, "tokenizer", tok)  # Qwen3.5 loads as a multimodal processor; the text tokenizer is inside
     device = next(model.parameters()).device
     im_end = tok.convert_tokens_to_ids("<|im_end|>")
