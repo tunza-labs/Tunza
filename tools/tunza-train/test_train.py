@@ -92,3 +92,18 @@ def test_softmax_over_sums_to_one_and_keeps_order():
 def test_intake_text_puts_the_story_first():
     txt = train.intake_text({"presentation": "she is not waking", "who": "child", "awake": "not_waking", "breathing": "unknown"})
     assert txt.startswith("she is not waking") and "awake: not_waking" in txt
+
+
+def test_mlx_progress_lines_are_parsed():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("mlx_run", Path(__file__).parent / "mlx_run.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    line = "Iter 10: Train loss 0.987, Learning Rate 1.000e-04, It/sec 0.512, Tokens/sec 233.4, Trained Tokens 4120, Peak mem 3.214 GB"
+    rep = mod.parse_report(line)
+    assert rep["step"] == 10 and rep["loss"] == 0.987 and rep["gpu_mem_gb"] == 3.214
+    assert mod.parse_report("Loading model") is None
+    assert mod.clean_answer("<think>\n\n</think>\n\n{\"disposition\":\"go_now\"}") == '{"disposition":"go_now"}'
+    row = ev.read_rows(DEV)[0]
+    msgs = mod.to_messages(row)["messages"]
+    assert msgs[0]["role"] == "user" and msgs[1]["role"] == "assistant" and json.loads(msgs[1]["content"])["disposition"] == row["answer"]["disposition"]
