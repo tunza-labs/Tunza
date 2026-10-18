@@ -41,6 +41,6 @@ open http://127.0.0.1:8790 || true
 
 TAG="${TAG:-sft-0.8b-s0-m1}"
 nohup .venv-train/bin/python tools/tunza-train/train.py --method "${METHOD:-sft}" --model Qwen/Qwen3.5-0.8B \
-  --runs runs --tag "$TAG" --steps "${STEPS:-80}" --seed "${SEED:-0}" > "$TAG.out.txt" 2> "$TAG.err.txt" &
+  --runs runs --tag "$TAG" --steps "${STEPS:-80}" --seed "${SEED:-0}" --batch "${BATCH:-1}" --accum "${ACCUM:-16}" > "$TAG.out.txt" 2> "$TAG.err.txt" &
 caffeinate -i -w $! &
 echo "Started $TAG. Watch it on the page that just opened. Logs: ~/code/tunza-train/$TAG.out.txt and .err.txt"
