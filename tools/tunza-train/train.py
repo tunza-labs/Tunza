@@ -263,6 +263,7 @@ def main() -> int:
             model = get_peft_model(model, LoraConfig(r=a.rank, lora_alpha=a.rank * 2, target_modules=TARGETS, task_type="CAUSAL_LM"))
         if mps:
             model = model.to("mps")
+    processor = tok  # kept whole so a full fine-tune can save the tokenizer files next to the weights
     tok = getattr(tok, "tokenizer", tok)  # Qwen3.5 loads as a multimodal processor; the text tokenizer is inside
     device = next(model.parameters()).device
     im_end = tok.convert_tokens_to_ids("<|im_end|>")
@@ -356,6 +357,8 @@ def main() -> int:
         if a.method == "sft_grpo":
             grpo_phase(model, tok, train_rows, a, out, tele, a.steps, device, pad, im_end, cuda, torch, FastLanguageModel if cuda else None, start, recent)
         model.save_pretrained(out / "adapter")
+        if a.full:
+            processor.save_pretrained(out / "adapter")  # without these files the saved model cannot be reloaded for scoring
         model.eval()
         if cuda:
             FastLanguageModel.for_inference(model)
