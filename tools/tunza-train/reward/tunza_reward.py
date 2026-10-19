@@ -21,6 +21,10 @@ import re
 from dataclasses import dataclass
 
 JEV_DERIVED = False
+REWARD_VERSION = 2  # 2026-10-19: grounding needs a whole word/phrase of 3+ chars; empty facts on danger cost 0.3; a real question needs 3+ words
+MIN_FACT_CHARS = 3
+MIN_QUESTION_WORDS = 3
+EMPTY_FACTS_PENALTY = -0.3
 MINIMUM_REWARD = -1.0
 MAXIMUM_REWARD = 1.0
 T7_SKIP_REASON = "base outputs not yet recorded"
@@ -71,9 +75,10 @@ REFERENCE_MIX_COUNTS = {
     "monitor_at_home": 5,
 }
 # Published D6 means for well-formed constant dispositions on the 20-case mix.
-# All-go_now is -0.05 only with the empty danger_facts penalty on expected-danger cases.
+# Reward version 2: all-go_now is -0.11 (was -0.05 under version 1) because empty danger_facts on an
+# expected-danger case now costs 0.3 instead of 0.1. The other three means are unchanged.
 CONSTANT_POLICY_MEANS = {
-    "go_now": -0.05,
+    "go_now": -0.11,
     "get_care_today": -0.185,
     "need_one_more_answer": -0.30,
     "monitor_at_home": -0.32,
@@ -413,7 +418,13 @@ def _follow_up_violation(disposition: str, question: str | None) -> bool:
             return True
         if len(question) > 200:
             return True
-        return question.count("?") != 1
+        stripped = question.strip()
+        if question.count("?") != 1 or not stripped.endswith("?"):
+            return True
+        if len(re.findall(r"\w+", stripped)) < MIN_QUESTION_WORDS:
+            return True
+        lowered = stripped.casefold()
+        return any(name in lowered for name in DISPOSITIONS)
     return question is not None
 
 
@@ -425,7 +436,7 @@ def _danger_facts_penalty(
 ) -> float:
     if not facts:
         if RANK[expected] == 40:
-            return -0.1
+            return EMPTY_FACTS_PENALTY
         return 0.0
     if _any_ungrounded(facts, case_input, free_text):
         return -0.2
@@ -440,10 +451,18 @@ def _any_ungrounded(facts: list[str], case_input: dict | None, free_text: str) -
             return True
         if fact in pairs:
             continue
-        if text and fact.casefold() in text:
+        if text and _whole_phrase_in(fact, text):
             continue
         return True
     return False
+
+
+def _whole_phrase_in(fact: str, text: str) -> bool:
+    """A fact is grounded only if it is 3+ characters and appears as a whole word or phrase, never inside a longer word."""
+    needle = fact.strip().casefold()
+    if len(needle) < MIN_FACT_CHARS:
+        return False
+    return re.search(r"(?<!\w)" + re.escape(needle) + r"(?!\w)", text) is not None
 
 
 def _free_text(case_input: dict | None, free_text: str) -> str:

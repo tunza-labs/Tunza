@@ -79,3 +79,8 @@ def test_inline_story_marker_and_family_prefix():
     assert res["by_language"]["sw"]["danger_missed"] == 1
     assert res["by_language"]["code-switch"]["n"] == 1
     assert res["by_language"]["code-switch"]["danger_missed"] == 0
+
+
+def test_every_result_carries_the_reward_version():
+    res = ev.evaluate([], lambda _prompt: "")
+    assert res["reward_version"] == ev.reward.REWARD_VERSION == 2

@@ -123,15 +123,26 @@ class TestAskCredit(unittest.TestCase):
         self.assertEqual(result.reward, 0.3)
 
     def test_bad_question_costs_two_tenths_and_does_not_fail_format(self):
+        words = lambda n: " ".join(["word"] * n)
         missing = reward.render_output("need_one_more_answer", [], None)
         doubled = reward.render_output("need_one_more_answer", [], "What? And this?")
-        too_long = reward.render_output("need_one_more_answer", [], ("x" * 200) + "?")
-        exact_limit = reward.render_output("need_one_more_answer", [], ("x" * 199) + "?")
+        too_long = reward.render_output("need_one_more_answer", [], words(41) + "?")
+        exact_limit_text = (words(39) + " " + "x" * 200)[:199] + "?"
+        exact_limit = reward.render_output("need_one_more_answer", [], exact_limit_text)
+        self.assertEqual(len(exact_limit_text), 200)
         self.assertEqual(reward.score(missing, expected="need_one_more_answer").reward, 0.8)
         self.assertEqual(reward.score(doubled, expected="need_one_more_answer").reward, 0.8)
         self.assertEqual(reward.score(too_long, expected="need_one_more_answer").reward, 0.8)
         self.assertEqual(reward.score(exact_limit, expected="need_one_more_answer").reward, 1.0)
         self.assertIsNone(reward.score(missing, expected="need_one_more_answer").stopped)
+
+    def test_a_question_must_be_a_real_question(self):
+        # reward version 2: one character, two words, no question mark at the end, or a hedged answer is not a good ask
+        for question in ("?", "Is it?", "Go now or wait", "Maybe go_now or monitor_at_home?", "Is the child drinking? yes"):
+            raw = reward.render_output("need_one_more_answer", [], question)
+            self.assertEqual(reward.score(raw, expected="need_one_more_answer").reward, 0.8, question)
+        good = reward.render_output("need_one_more_answer", [], "Is the child able to drink?")
+        self.assertEqual(reward.score(good, expected="need_one_more_answer").reward, 1.0)
 
     def test_question_on_a_known_answer_is_penalised(self):
         raw = reward.render_output("monitor_at_home", [], "What else?")
@@ -146,11 +157,20 @@ class TestAskCredit(unittest.TestCase):
 
 
 class TestGrounding(unittest.TestCase):
-    def test_empty_facts_on_danger_cost_one_tenth(self):
+    def test_empty_facts_on_danger_cost_three_tenths(self):
         raw = reward.render_output("go_now", [], None)
         result = reward.score(raw, expected="go_now", case_input=_case("go_now"))
-        self.assertEqual(result.reward, 0.9)
-        self.assertEqual(result.danger_facts_penalty, -0.1)
+        self.assertEqual(result.reward, 0.7)
+        self.assertEqual(result.danger_facts_penalty, -0.3)
+
+    def test_a_scrap_of_the_story_is_not_a_grounded_fact(self):
+        # reward version 2: the audit showed danger_facts ["a"] or ["in"] scored full credit
+        case = {"presentation": "child has a fever and is drinking"}
+        for fact in ("a", "in", "ha", "fev", "rink"):
+            raw = reward.render_output("go_now", [fact], None)
+            self.assertEqual(reward.score(raw, expected="go_now", case_input=case).reward, 0.8, fact)
+        whole = reward.render_output("go_now", ["is drinking"], None)
+        self.assertEqual(reward.score(whole, expected="go_now", case_input=case).reward, 1.0)
 
     def test_ungrounded_facts_cost_two_tenths_once(self):
         raw = reward.render_output("monitor_at_home", ["missing-one", "missing-two"], None)

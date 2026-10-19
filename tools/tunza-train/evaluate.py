@@ -196,6 +196,7 @@ def evaluate(rows: list[dict], generate) -> dict:
     valid = sum(1 for r in results if r.format_error is None)
     return {
         "n": n,
+        "reward_version": reward.REWARD_VERSION,
         "valid_json_rate": valid / n if n else 0.0,
         "mean_reward": sum(r.reward for r in results) / n if n else 0.0,
         "danger_cases": danger_total,
