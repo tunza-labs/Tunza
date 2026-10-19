@@ -100,3 +100,11 @@ def test_a_run_that_is_still_loading_counts_as_training(tmp_path):
     (d / "meta.json").write_text(json.dumps({"method": "sft", "seed": 0, "size": "0.8b", "total_steps": 20, "pid": 77}))
     st = live.build_state(tmp_path, None)
     assert st["runs"][0]["state"] == "queued" and st["current"] == "loading"
+
+
+def test_a_full_fine_tune_gets_its_own_method_row(tmp_path):
+    d = tmp_path / "full"
+    d.mkdir()
+    (d / "meta.json").write_text(json.dumps({"method": "sft", "mode": "full", "seed": 0, "size": "0.8b", "total_steps": 20, "pid": 78}))
+    st = live.build_state(tmp_path, None)
+    assert st["runs"][0]["method"] == "sft_full" and "sft_full" in st["methods"]
