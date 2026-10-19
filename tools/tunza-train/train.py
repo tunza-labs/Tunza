@@ -226,7 +226,7 @@ def main() -> int:
     out = Path(a.runs) / tag
     out.mkdir(parents=True, exist_ok=True)
     train_rows, dev_rows = ev.read_rows(Path(a.train)), ev.read_rows(Path(a.dev))
-    meta = {"method": a.method, "seed": a.seed, "size": size, "mode": "lora", "model": a.model, "total_steps": (a.steps + (a.grpo_steps if a.method == "sft_grpo" else 0)) if a.method != "base" else 1,
+    meta = {"method": a.method, "seed": a.seed, "size": size, "mode": "full" if a.full else "lora", "model": a.model, "total_steps": (a.steps + (a.grpo_steps if a.method == "sft_grpo" else 0)) if a.method != "base" else 1,
             "pid": os.getpid(), "train_sha256": sha256_file(Path(a.train)), "dev_sha256": sha256_file(Path(a.dev)),
             "engineering_only": True, "jev_derived": False, "clinical_data": False, "started": time.time()}
     (out / "meta.json").write_text(json.dumps(meta, indent=2))
