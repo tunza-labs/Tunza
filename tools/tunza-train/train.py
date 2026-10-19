@@ -217,6 +217,7 @@ def main() -> int:
     ap.add_argument("--group", type=int, default=6)
     ap.add_argument("--sealed", default=None, help="also score this sealed test file after training (slow; use for finalists)")
     ap.add_argument("--grad_ckpt", action="store_true", help="trade speed for memory on the Apple Silicon path (8 GB Macs)")
+    ap.add_argument("--full", action="store_true", help="full fine-tune: train every weight, no LoRA (needs a 24 GB+ GPU such as Jacob's RTX 5090)")
     ap.add_argument("--no_probe", action="store_true", help="skip the live example probe on the page")
     a = ap.parse_args()
 
@@ -244,8 +245,8 @@ def main() -> int:
         from unsloth import FastLanguageModel  # must load before transformers
     torch.manual_seed(a.seed)
     if cuda:
-        model, tok = FastLanguageModel.from_pretrained(a.model, max_seq_length=a.max_len, dtype=torch.bfloat16, load_in_4bit=False)
-        if a.method != "base":
+        model, tok = FastLanguageModel.from_pretrained(a.model, max_seq_length=a.max_len, dtype=torch.bfloat16, load_in_4bit=False, **({"full_finetuning": True} if a.full else {}))
+        if a.method != "base" and not a.full:
             model = FastLanguageModel.get_peft_model(model, r=a.rank, target_modules=TARGETS, lora_alpha=a.rank * 2, lora_dropout=0.0,
                                                      bias="none", use_gradient_checkpointing="unsloth", random_state=a.seed)
     else:
