@@ -125,6 +125,9 @@ def probe_example(model, tok, row: dict, device, pad: int, im_end: int, cuda: bo
     return {"text": intake_text(row["intake"]), "probs": probs, "label": label, "danger": 0, "options": PROBE_OPTIONS}
 
 
+RL_METHODS = ("sft_grpo", "sft_rloo", "sft_ppo")
+
+
 def grpo_phase(model, tok, rows, a, out, tele, step0, device, pad, im_end, cuda, torch, FastLM, start, recent):
     """Group-relative policy gradient with the code-owned reward. Each step: sample answers for a danger case and another case,
     score them with the reward, and move toward the answers that beat their group's average. loss in telemetry is the negative mean reward."""
@@ -161,24 +164,50 @@ def grpo_phase(model, tok, rows, a, out, tele, step0, device, pad, im_end, cuda,
                     misses += 1
             mean = sum(r for _, r in group) / len(group)
             std = (sum((r - mean) ** 2 for _, r in group) / len(group)) ** 0.5
+            gsum = sum(r for _, r in group)
             for c, r in group:
-                samples.append((pids, c, 0.0 if std < 1e-6 else (r - mean) / (std + 1e-4)))
+                if a.method == "sft_rloo":  # leave-one-out baseline, no std scaling
+                    adv = r - (gsum - r) / max(1, len(group) - 1)
+                else:
+                    adv = 0.0 if std < 1e-6 else (r - mean) / (std + 1e-4)
+                samples.append((pids, c, adv))
         if cuda:
             torch.cuda.empty_cache()
             FastLM.for_training(model)
         model.train()
         opt.zero_grad(set_to_none=True)
         total, used = 0.0, 0
-        for pids, c, adv in samples:
-            if adv == 0.0 or not c:
-                continue
+
+        def seq_lp(pids, c):
             ids = torch.tensor([pids + c], device=device)
             logits = model(input_ids=ids).logits[0, len(pids) - 1:-1].float()
-            lp = torch.log_softmax(logits, dim=-1).gather(1, torch.tensor(c, device=device)[:, None])[:, 0]
-            loss = -(adv * lp.mean()) / max(1, len(samples))
-            loss.backward()
-            total += float(loss)
-            used += 1
+            return torch.log_softmax(logits, dim=-1).gather(1, torch.tensor(c, device=device)[:, None])[:, 0]
+
+        old_lp = {}
+        if a.method == "sft_ppo":  # sampling policy's token log-probs, fixed for the clipped ratio
+            with torch.no_grad():
+                for i, (pids, c, adv) in enumerate(samples):
+                    if adv != 0.0 and c:
+                        old_lp[i] = seq_lp(pids, c).detach()
+        for ep in range(a.ppo_epochs if a.method == "sft_ppo" else 1):
+            if ep:
+                opt.zero_grad(set_to_none=True)
+            for i, (pids, c, adv) in enumerate(samples):
+                if adv == 0.0 or not c:
+                    continue
+                lp = seq_lp(pids, c)
+                if a.method == "sft_ppo":
+                    ratio = torch.exp(lp - old_lp[i])
+                    adv_t = torch.tensor(adv, device=device)
+                    loss = -torch.minimum(ratio * adv_t, torch.clamp(ratio, 1 - a.clip, 1 + a.clip) * adv_t).mean() / max(1, len(samples))
+                else:
+                    loss = -(adv * lp.mean()) / max(1, len(samples))
+                loss.backward()
+                total += float(loss)
+                used += 1
+            if a.method == "sft_ppo" and ep + 1 < a.ppo_epochs:
+                torch.nn.utils.clip_grad_norm_(params, 1.0)
+                opt.step()
         grads = {n: float(p.grad.detach().float().norm()) for n, p in model.named_parameters() if p.requires_grad and p.grad is not None}
         gnorm = float(torch.nn.utils.clip_grad_norm_(params, 1.0)) if used else 0.0
         if used:
@@ -198,7 +227,7 @@ def grpo_phase(model, tok, rows, a, out, tele, step0, device, pad, im_end, cuda,
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--method", choices=["base", "sft", "sft_cost", "orpo", "dpo", "sft_grpo"], required=True)
+    ap.add_argument("--method", choices=["base", "sft", "sft_cost", "orpo", "dpo", "sft_grpo", "sft_rloo", "sft_ppo"], required=True)
     ap.add_argument("--model", default="Qwen/Qwen3.5-0.8B")
     ap.add_argument("--train", default=str(HERE / "data" / "triage-train.jsonl"))
     ap.add_argument("--dev", default=str(HERE / "data" / "triage-dev.jsonl"))
@@ -215,6 +244,8 @@ def main() -> int:
     ap.add_argument("--grpo_steps", type=int, default=40)
     ap.add_argument("--grpo_lr", type=float, default=1e-5)
     ap.add_argument("--group", type=int, default=6)
+    ap.add_argument("--ppo_epochs", type=int, default=2, help="sft_ppo: gradient passes over each sampled batch")
+    ap.add_argument("--clip", type=float, default=0.2, help="sft_ppo: ratio clip")
     ap.add_argument("--sealed", default=None, help="also score this sealed test file after training (slow; use for finalists)")
     ap.add_argument("--grad_ckpt", action="store_true", help="trade speed for memory on the Apple Silicon path (8 GB Macs)")
     ap.add_argument("--full", action="store_true", help="full fine-tune: train every weight, no LoRA (needs a 24 GB+ GPU such as Jacob's RTX 5090)")
@@ -226,13 +257,13 @@ def main() -> int:
     out = Path(a.runs) / tag
     out.mkdir(parents=True, exist_ok=True)
     train_rows, dev_rows = ev.read_rows(Path(a.train)), ev.read_rows(Path(a.dev))
-    meta = {"method": a.method, "seed": a.seed, "size": size, "mode": "full" if a.full else "lora", "model": a.model, "total_steps": (a.steps + (a.grpo_steps if a.method == "sft_grpo" else 0)) if a.method != "base" else 1,
+    meta = {"method": a.method, "seed": a.seed, "size": size, "mode": "full" if a.full else "lora", "model": a.model, "total_steps": (a.steps + (a.grpo_steps if a.method in RL_METHODS else 0)) if a.method != "base" else 1,
             "pid": os.getpid(), "train_sha256": sha256_file(Path(a.train)), "dev_sha256": sha256_file(Path(a.dev)),
             "engineering_only": True, "jev_derived": False, "clinical_data": False, "started": time.time()}
     (out / "meta.json").write_text(json.dumps(meta, indent=2))
 
-    if a.method == "sft_grpo":
-        ok, why = mt.rl_gate(Path(a.runs), a.method, a.seed, prefix=tag[:tag.index(a.method)] if a.method in tag else "")
+    if a.method in RL_METHODS:
+        ok, why = mt.rl_gate(Path(a.runs), a.method, a.seed, prefix=tag[:tag.index(a.method)] if a.method in tag else "", size=size)
         meta["rl_gate"] = why
         (out / "meta.json").write_text(json.dumps(meta, indent=2))
         if not ok:
@@ -354,7 +385,7 @@ def main() -> int:
                             raise
                 (out / "layerstats.json.tmp").write_text(json.dumps({"step": step, "steps": a.steps, "loss": total_loss, "rows": rows_now, "recent": recent}))
                 (out / "layerstats.json.tmp").replace(out / "layerstats.json")
-        if a.method == "sft_grpo":
+        if a.method in RL_METHODS:
             grpo_phase(model, tok, train_rows, a, out, tele, a.steps, device, pad, im_end, cuda, torch, FastLanguageModel if cuda else None, start, recent)
         model.save_pretrained(out / "adapter")
         if a.full:
