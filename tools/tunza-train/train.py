@@ -245,6 +245,7 @@ def main() -> int:
     ap.add_argument("--grpo_lr", type=float, default=1e-5)
     ap.add_argument("--group", type=int, default=6)
     ap.add_argument("--ppo_epochs", type=int, default=2, help="sft_ppo: gradient passes over each sampled batch")
+    ap.add_argument("--attn", choices=["default", "flash2"], default="default", help="flash2: ask for FlashAttention-2 (needs flash_attn in the environment; default off)")
     ap.add_argument("--clip", type=float, default=0.2, help="sft_ppo: ratio clip")
     ap.add_argument("--sealed", default=None, help="also score this sealed test file after training (slow; use for finalists)")
     ap.add_argument("--grad_ckpt", action="store_true", help="trade speed for memory on the Apple Silicon path (8 GB Macs)")
@@ -257,7 +258,7 @@ def main() -> int:
     out = Path(a.runs) / tag
     out.mkdir(parents=True, exist_ok=True)
     train_rows, dev_rows = ev.read_rows(Path(a.train)), ev.read_rows(Path(a.dev))
-    meta = {"method": a.method, "seed": a.seed, "size": size, "mode": "full" if a.full else "lora", "model": a.model, "total_steps": (a.steps + (a.grpo_steps if a.method in RL_METHODS else 0)) if a.method != "base" else 1,
+    meta = {"method": a.method, "seed": a.seed, "size": size, "mode": "full" if a.full else "lora", "attn": a.attn, "model": a.model, "total_steps": (a.steps + (a.grpo_steps if a.method in RL_METHODS else 0)) if a.method != "base" else 1,
             "pid": os.getpid(), "train_sha256": sha256_file(Path(a.train)), "dev_sha256": sha256_file(Path(a.dev)),
             "engineering_only": True, "jev_derived": False, "clinical_data": False, "started": time.time()}
     (out / "meta.json").write_text(json.dumps(meta, indent=2))
@@ -276,7 +277,7 @@ def main() -> int:
         from unsloth import FastLanguageModel  # must load before transformers
     torch.manual_seed(a.seed)
     if cuda:
-        model, tok = FastLanguageModel.from_pretrained(a.model, max_seq_length=a.max_len, dtype=torch.bfloat16, load_in_4bit=False, **({"full_finetuning": True} if a.full else {}))
+        model, tok = FastLanguageModel.from_pretrained(a.model, max_seq_length=a.max_len, dtype=torch.bfloat16, load_in_4bit=False, **({"full_finetuning": True} if a.full else {}), **({"attn_implementation": "flash_attention_2"} if a.attn == "flash2" else {}))
         if a.method != "base" and not a.full:
             model = FastLanguageModel.get_peft_model(model, r=a.rank, target_modules=TARGETS, lora_alpha=a.rank * 2, lora_dropout=0.0,
                                                      bias="none", use_gradient_checkpointing="unsloth", random_state=a.seed)
