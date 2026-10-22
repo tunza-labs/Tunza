@@ -1,5 +1,10 @@
 import { fill, t, type CopyKey, type Locale } from "./copy";
-import { facilityById, pickFacility, redirectFacility } from "./facilities";
+import {
+  facilityById,
+  pickFacility,
+  redirectTarget,
+  type CapacityMap,
+} from "./facilities";
 import { createId, nowIso } from "./ids";
 import type {
   DecisionKind,
@@ -31,6 +36,7 @@ export type ReferralAction =
   | "complete"
   | "return_outcome"
   | "redirect"
+  | "decline"
   | "ask_more";
 
 const STAGE_AFTER: Record<ReferralAction, ReferralStage | null> = {
@@ -43,6 +49,7 @@ const STAGE_AFTER: Record<ReferralAction, ReferralStage | null> = {
   complete: "completed",
   return_outcome: "outcome_returned",
   redirect: "sent",
+  decline: "sent",
   ask_more: "received",
 };
 
@@ -101,6 +108,7 @@ export function canPerform(
     case "return_outcome":
       return stage === "completed";
     case "redirect":
+    case "decline":
       return stage === "sent" || stage === "received" || stage === "accepted";
     case "ask_more":
       return stage === "sent" || stage === "received";
@@ -118,6 +126,8 @@ export function applyReferralAction(
     noFacilityResponse: boolean;
     weakConnection: boolean;
     outcome?: OutcomeCode;
+    /** Reported facility capacity; the redirect skips closed facilities. */
+    capacity?: CapacityMap;
   },
 ): Referral {
   const at = nowIso();
@@ -154,8 +164,17 @@ export function applyReferralAction(
     };
   }
 
-  if (action === "redirect") {
-    const nextFacility = redirectFacility(referral.facilityId);
+  if (action === "redirect" || action === "decline") {
+    // "Cannot take" goes through the same redirect so the referral is never
+    // left without a destination. With no open facility it stays put.
+    const nextFacility = redirectTarget(referral.facilityId, options.capacity);
+    if (!nextFacility) {
+      return referral;
+    }
+    const entry =
+      action === "decline"
+        ? { stage: "sent" as const, at, by, note: nextFacility.name, reason: "cannot_take" as const }
+        : { stage: "sent" as const, at, by, note: nextFacility.name };
     return {
       ...referral,
       stage: "sent",
@@ -163,10 +182,7 @@ export function applyReferralAction(
       expectedArrivalMinutes: nextFacility.travelMinutes,
       failure: "redirected",
       askMore: null,
-      history: [
-        ...referral.history,
-        { stage: "sent", at, by, note: nextFacility.name },
-      ],
+      history: [...referral.history, entry],
       updatedAt: at,
     };
   }

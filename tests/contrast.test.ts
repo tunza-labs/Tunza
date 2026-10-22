@@ -45,9 +45,12 @@ const TEXT_PAIRS: [string, string][] = [
   ["urgent", "raised"],
   ["urgent", "urgent-soft"], // danger panels
   ["today", "paper"],
+  ["today", "raised"], // facility inbox: get-care-today answer, no-open-facility note
   ["today", "today-soft"],
   ["watch", "paper"],
+  ["watch", "raised"], // facility inbox: monitor-at-home answer
   ["watch", "watch-soft"],
+  ["warn", "raised"], // engineering panel: shadow candidate label
   ["warn", "warn-soft"],
 ];
 

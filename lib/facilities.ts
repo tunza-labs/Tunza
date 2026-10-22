@@ -1,4 +1,4 @@
-import type { Facility } from "./types";
+import type { Facility, FacilityCapacity } from "./types";
 
 /** Clearly fake demo facilities — not real sites. */
 export const DEMO_FACILITIES: Facility[] = [
@@ -35,4 +35,29 @@ export function pickFacility(urgent: boolean): Facility {
 
 export function redirectFacility(currentId: string): Facility {
   return DEMO_FACILITIES.find((item) => item.id !== currentId) ?? DEMO_FACILITIES[1];
+}
+
+/** Capacity per facility id. A facility with no entry is accepting. */
+export type CapacityMap = Partial<Record<string, FacilityCapacity>>;
+
+export function capacityOf(capacity: CapacityMap, id: string): FacilityCapacity {
+  return capacity[id] ?? "accepting";
+}
+
+/**
+ * Capacity-aware redirect target. Skips closed facilities and prefers one
+ * accepting now over one that is busy. Returns null when no other facility
+ * is open, so the caller keeps the referral instead of sending it to a
+ * closed door. With no capacity reported this matches redirectFacility().
+ */
+export function redirectTarget(
+  currentId: string,
+  capacity: CapacityMap = {},
+): Facility | null {
+  const others = DEMO_FACILITIES.filter((item) => item.id !== currentId);
+  return (
+    others.find((item) => capacityOf(capacity, item.id) === "accepting") ??
+    others.find((item) => capacityOf(capacity, item.id) === "busy") ??
+    null
+  );
 }

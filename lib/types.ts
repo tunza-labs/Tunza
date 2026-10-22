@@ -86,6 +86,8 @@ export type ReferralHistoryEntry = {
   at: string;
   by: Role;
   note?: string;
+  /** Set when a facility said it cannot take the patient. */
+  reason?: "cannot_take";
 };
 
 export type Referral = {
@@ -122,6 +124,27 @@ export type Encounter = {
   updatedAt: string;
 };
 
+/** A facility's self-reported capacity. The redirect logic reads it. */
+export type FacilityCapacity = "accepting" | "busy" | "closed";
+
+export type PatientSex = "female" | "male";
+
+/** A model's proposed disposition, kept for engineering review only. */
+export type ShadowCandidate = { disposition: string; model_id: string | null };
+
+/**
+ * A synthetic referral for the facility desk demo. Never a real patient.
+ * The answer shown is always decide() on these answers; the shadow
+ * candidate is never applied.
+ */
+export type DemoReferralCase = {
+  encounter: Encounter;
+  referral: Referral;
+  ageMonths: number | null;
+  sex: PatientSex | null;
+  shadowCandidate: ShadowCandidate | null;
+};
+
 /** The household surface's top-level view; other roles ignore it. */
 export type HouseholdView = "home" | "path" | "nearby" | "gate";
 
@@ -140,4 +163,10 @@ export type CareState = {
   encounter: Encounter | null;
   referral: Referral | null;
   online: boolean;
+  /** Capacity per demo facility id; missing means accepting. */
+  facilityCapacity: Record<string, FacilityCapacity>;
+  /** The demo facility the facility desk is acting as. */
+  deskFacilityId: string;
+  /** Synthetic referrals shown in the facility inbox, clearly labelled demo. */
+  demoCases: DemoReferralCase[];
 };
