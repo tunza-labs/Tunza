@@ -102,6 +102,66 @@ def test_a_run_that_is_still_loading_counts_as_training(tmp_path):
     assert st["runs"][0]["state"] == "queued" and st["current"] == "loading"
 
 
+def test_supervisor_log_counts_launches_and_retries():
+    text = ("2026-10-20T04:44:24 training=0\n"
+            "2026-10-20T04:44:25 launched v3-a attempt 1\n"
+            "2026-10-20T08:38:28 launched v3-b attempt 1\n"
+            "2026-10-20T08:42:28 launched v3-b attempt 2\n"
+            "garbage line\n"
+            "2026-10-20T16:37:20 training=2\n")
+    got = live.parse_supervisor_log(text)
+    assert got["launched"] == {"v3-a": 1, "v3-b": 2}
+    assert got["training"] == {"at": "2026-10-20T16:37:20", "n": 2}
+
+
+def test_supervisor_log_utf16_with_bom_is_read(tmp_path):
+    log = tmp_path / "supervisor.log"
+    log.write_bytes("2026-10-20T04:44:25 launched v3-a attempt 1\n".encode("utf-16"))
+    assert live.read_supervisor_log(log)["launched"] == {"v3-a": 1}
+    assert live.read_supervisor_log(tmp_path / "missing.log")["launched"] == {}
+
+
+def test_queue_summary_counts_by_method_and_state(tmp_path):
+    runs = [
+        {"tag": "a", "method": "sft", "state": "done"},
+        {"tag": "b", "method": "sft", "state": "running"},
+        {"tag": "c", "method": "dpo", "state": "queued"},
+        {"tag": "d", "method": "dpo", "state": "failed"},
+    ]
+    log = live.parse_supervisor_log("x launched a attempt 1\nx launched z attempt 1\n")
+    q = live.queue_summary(runs, log)
+    assert q["by_method"]["sft"] == {"done": 1, "running": 1, "queued": 0, "stalled": 0, "failed": 0}
+    assert q["total"]["done"] == 1 and q["total"]["queued"] == 1 and q["total"]["failed"] == 1
+    assert q["launched"] == 2 and q["no_folder"] == 1 and q["retried"] == 0
+
+
+def test_queue_summary_counts_attempts_and_marks_a_stale_training_reading():
+    log = live.parse_supervisor_log("x launched a attempt 1\nx launched b attempt 1\nx launched b attempt 2\n"
+                                    "2026-10-21T19:16:38 training=4\n")
+    at = live.datetime.fromisoformat("2026-10-21T19:16:38").timestamp()
+    q = live.queue_summary([], log, now=at + 60)
+    assert (q["launched"], q["attempts"], q["retried"]) == (2, 3, 1)
+    assert q["training"]["stale"] is False
+    assert live.queue_summary([], log, now=at + live.SUPERVISOR_STALE_SECONDS + 1)["training"]["stale"] is True
+
+
+def test_page_renders_every_queue_state_per_method():
+    assert "id=qb" in live.PAGE and "renderQueue(d)" in live.PAGE
+    counts = live.PAGE.split("function queueCounts(c){", 1)[1].split("}", 1)[0]
+    for state in live.QUEUE_STATES:
+        assert "c." + state in counts
+    assert "queueCounts(q.by_method[m])" in live.PAGE
+
+
+def test_build_state_reads_the_log_next_to_runs(tmp_path):
+    make_run(tmp_path / "runs", "a", 10)
+    log = tmp_path / "supervisor.log"
+    log.write_text("x launched a attempt 1\n", encoding="utf-8")
+    q = live.build_state(tmp_path / "runs", None, log=log)["queue"]
+    assert q["launched"] == 1 and q["total"]["done"] == 1
+    assert live.build_state(tmp_path / "runs", None)["queue"]["launched"] == 0
+
+
 def test_a_full_fine_tune_gets_its_own_method_row(tmp_path):
     d = tmp_path / "full"
     d.mkdir()

@@ -3,12 +3,13 @@
 
 Read-only. It never starts, stops or changes a run. Standard library only.
 
-  python tools/tunza-train/live.py [--runs runs] [--plan tools/tunza-train/plan-status.json] [--port 8790]
+  python tools/tunza-train/live.py [--runs runs] [--log supervisor.log] [--plan tools/tunza-train/plan-status.json] [--port 8790]
 
 Each run is a folder under --runs:
   meta.json         method, seed, size, mode (lora|full), total_steps, pid (optional), done/failed flags
   telemetry.jsonl   one JSON object per line: step, loss, lr, grad_norm, tok_per_s, gpu_mem_gb, elapsed_s, examples_seen
   layerstats.json   optional: {step, steps, loss, rows:[{layer, mod, rel_change, grad}], recent:[{text, probs, label, options, danger}]}
+--log (default: supervisor.log next to --runs) is optional. Its lines are "<time> launched <tag> attempt <n>" and "<time> training=<n>".
 
 Nothing is invented. With no runs the page says so. The hardware panel shows the exact error when the GPU cannot be read.
 """
@@ -23,13 +24,18 @@ import shutil
 import subprocess
 import sys
 import time
+from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-METHODS = ("sft", "sft_full", "sft_cost", "rft", "dpo", "kto", "orpo", "grpo", "gspo", "sft_grpo")
+METHODS = ("sft", "sft_full", "sft_cost", "rft", "dpo", "kto", "orpo", "grpo", "gspo", "sft_grpo", "sft_rloo", "sft_ppo")
 SEEDS = (0, 1, 2)
 TARGET_LOW, TARGET_HIGH = 85, 92  # full-use band for GPU busy percent, same as tunza-adw
 STALE_SECONDS = 120
+SUPERVISOR_STALE_SECONDS = 600
+QUEUE_STATES = ("done", "running", "queued", "stalled", "failed")
+LAUNCH_RE = re.compile(r"^\S+ launched (\S+) attempt (\d+)$")
+TRAIN_RE = re.compile(r"^(\S+) training=(\d+)$")
 
 
 def read_json(path: Path, default):
@@ -110,6 +116,59 @@ def summarize_run(folder: Path, now: float) -> dict:
         "examples_seen": rows[-1].get("examples_seen") if rows else None,
         "eta_min": eta_min,
         "mtime": mtime,
+    }
+
+
+def parse_supervisor_log(text: str) -> dict:
+    """Launch attempts per run tag and the last training count. Other lines are skipped."""
+    launched: dict[str, int] = {}
+    training = None
+    for line in text.splitlines():
+        line = line.strip()
+        m = LAUNCH_RE.match(line)
+        if m:
+            launched[m.group(1)] = max(launched.get(m.group(1), 0), int(m.group(2)))
+            continue
+        m = TRAIN_RE.match(line)
+        if m:
+            training = {"at": m.group(1), "n": int(m.group(2))}
+    return {"launched": launched, "training": training}
+
+
+def read_supervisor_log(path: Path | None) -> dict:
+    """The supervisor log may be UTF-16 (PowerShell writes it that way), so read the BOM before decoding."""
+    try:
+        raw = path.read_bytes() if path else b""
+    except OSError:
+        raw = b""
+    text = raw.decode("utf-16" if raw[:2] in (b"\xff\xfe", b"\xfe\xff") else "utf-8", errors="replace")
+    return parse_supervisor_log(text)
+
+
+def queue_summary(runs: list[dict], log: dict, now: float | None = None) -> dict:
+    """Jobs by method and state from the run folders. Jobs the supervisor has not reached are not visible here.
+    Launched tags with no folder yet are counted apart. The training=<n> reading is stale when older than
+    SUPERVISOR_STALE_SECONDS: the supervisor writes it every 240 s."""
+    by_method: dict[str, dict[str, int]] = {}
+    for r in runs:
+        counts = by_method.setdefault(r["method"] or "?", {s: 0 for s in QUEUE_STATES})
+        counts[r["state"]] += 1
+    tags = {r["tag"] for r in runs}
+    training = log["training"]
+    if training:
+        try:
+            age = (now or time.time()) - datetime.fromisoformat(training["at"]).timestamp()
+        except ValueError:
+            age = None
+        training = {**training, "stale": age is None or age > SUPERVISOR_STALE_SECONDS}
+    return {
+        "by_method": by_method,
+        "total": {s: sum(c[s] for c in by_method.values()) for s in QUEUE_STATES},
+        "launched": len(log["launched"]),
+        "attempts": sum(log["launched"].values()),
+        "retried": sum(1 for n in log["launched"].values() if n > 1),
+        "no_folder": sum(1 for t in log["launched"] if t not in tags),
+        "training": training,
     }
 
 
@@ -302,7 +361,7 @@ def dedication(gpu: dict, active: dict | None) -> dict:
     return {"tone": "ok", "text": f"Card in full use: {util:.0f}% busy, no other GPU programs."}
 
 
-def build_state(runs_dir: Path, plan: Path | None, now: float | None = None) -> dict:
+def build_state(runs_dir: Path, plan: Path | None, now: float | None = None, log: Path | None = None) -> dict:
     now = now or time.time()
     runs = []
     if runs_dir.is_dir():
@@ -323,6 +382,7 @@ def build_state(runs_dir: Path, plan: Path | None, now: float | None = None) -> 
         "runs": runs,
         "current": current["tag"] if current else None,
         "plan": load_plan(plan),
+        "queue": queue_summary(runs, read_supervisor_log(log), now),
         "gpu": gpu,
         "ram": ram_info(),
         "disk_free_gb": free_gb,
@@ -344,7 +404,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font:14px/1.
 #left{left:12px;top:72px;bottom:260px;width:min(370px,30vw);display:flex;flex-direction:column;gap:10px;position:fixed}
 #right{right:12px;top:72px;bottom:260px;width:min(330px,28vw);display:flex;flex-direction:column;gap:10px;position:fixed}
 #left .glass,#right .glass{position:relative;overflow:auto}
-#plan{flex:1}#inp{flex:0 0 auto;max-height:34%}#hw{flex:0 0 auto}#out{flex:1}
+#plan{flex:1}#inp{flex:0 0 auto;max-height:34%}#hw{flex:0 0 auto}#queue{flex:0 0 auto;max-height:34%}#out{flex:1}
 .ph{display:flex;gap:8px;align-items:baseline;margin:3px 0;font-size:13px}.ph b{font-weight:600}.ph .c{color:var(--mut);margin-left:auto;white-space:nowrap}
 .dot{width:10px;height:10px;border-radius:50%;flex:none;border:1px solid var(--mut);align-self:center}.dot.done{background:var(--ok);border-color:var(--ok)}.dot.running{background:var(--warn);border-color:var(--warn)}.dot.failed{background:var(--bad);border-color:var(--bad)}
 #txt{font-size:13px;color:#ffe3e0;max-height:15vh;overflow:hidden;white-space:pre-wrap;word-break:break-word}
@@ -367,6 +427,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font:14px/1.
 <div id=left><div id=plan class=glass><div class=lab>Plan</div><div id=phases>loading</div></div>
 <div id=inp class=glass><div class=lab>Example being read</div><div id=txt>waiting for the first example</div></div></div>
 <div id=right><div id=hw class=glass><div class=lab>This PC</div><div id=hwb>loading</div><div id=ded></div></div>
+<div id=queue class=glass><div class=lab>Queue (run folders only, not the supervisor backlog)</div><div id=qb>loading</div></div>
 <div id=out class=glass><div class=lab>Model answer</div><div id=opts></div><div id=verdict style="font-weight:650;margin-top:6px"></div></div></div>
 <div id=prev style="position:fixed;left:50%;bottom:262px;transform:translateX(-50%);color:var(--mut);font-size:12px;display:none;pointer-events:none;background:var(--glass);border:1px solid var(--edge);border-radius:8px;padding:4px 10px">Layout preview of the 24 layers. It lights up with real data when step 3 is logged.</div>
 <div id=empty><div style="font-size:18px;color:var(--fg)">No training run has started</div><div>The page fills in as soon as a run writes its first step.</div></div>
@@ -444,7 +505,7 @@ if(t-swapT>4&&RECENT.length){cur=(cur+1)%RECENT.length;swapT=t;showEx()}}
 ctl.update();comp.render();requestAnimationFrame(frame)}
 const OPTS=['go_now','get_care_today','need_one_more_answer','monitor_at_home'];
 function PU(ex){return ex&&ex.probs?(ex.probs[ex.danger==null?0:ex.danger]||0):0}
-const COLORS={sft:'#7aa2ff',sft_full:'#22d3ee',sft_cost:'#ff5c8a',rft:'#f0abfc',dpo:'#38bdf8',kto:'#4fd1c5',orpo:'#ffd166',grpo:'#ff8a5c',gspo:'#b48cff',sft_grpo:'#a3e635'};
+const COLORS={sft:'#7aa2ff',sft_full:'#22d3ee',sft_cost:'#ff5c8a',rft:'#f0abfc',dpo:'#38bdf8',kto:'#4fd1c5',orpo:'#ffd166',grpo:'#ff8a5c',gspo:'#b48cff',sft_grpo:'#a3e635',sft_rloo:'#facc15',sft_ppo:'#fb7185'};
 const $=id=>document.getElementById(id);
 function mk(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e}
 function showEx(){const ex=RECENT[cur%RECENT.length];if(!ex)return;let txt=ex.text;try{const o=JSON.parse(ex.text);txt=typeof o==='string'?o:(o.request||JSON.stringify(o))}catch(e){}
@@ -475,6 +536,12 @@ if(d.disk_free_gb!=null){const low=d.disk_free_gb<50;const e=mk('div',low?'bad':
 const ded=$('ded');ded.textContent=d.dedication.text;ded.className=d.dedication.tone}
 function renderPlan(p){const box=$('phases');box.textContent='';if(!p.phases.length){box.append(mk('div','idle',p.note||'no plan loaded'));return}
 p.phases.forEach(ph=>{const r=mk('div','ph');r.append(mk('span','dot '+ph.status),mk('b',null,ph.name),mk('span','c',ph.total?ph.done+'/'+ph.total:''));box.append(r)})}
+function queueCounts(c){return c.done+' done · '+c.running+' running · '+c.queued+' queued'+(c.stalled?' · '+c.stalled+' stalled':'')+(c.failed?' · '+c.failed+' failed':'')}
+function renderQueue(d){const q=d.queue,b=$('qb');b.textContent='';
+b.append(mk('div',null,queueCounts(q.total)));
+Object.keys(q.by_method).sort().forEach(m=>{b.append(mk('div','ph',m));b.lastChild.append(mk('span','c',queueCounts(q.by_method[m])))});
+const tr=q.training?' · training='+q.training.n+' at '+q.training.at+(q.training.stale?' (stale, supervisor may be stopped)':''):'';
+b.append(mk('div','m2','supervisor log: '+q.launched+' tags launched, '+q.attempts+' attempts, '+q.retried+' retried'+(q.no_folder?', '+q.no_folder+' with no run folder yet':'')+tr))}
 function renderGrid(d){const cur=d.runs.find(r=>r.tag===d.current),size=cur?cur.size:null;const by={};
 d.runs.filter(r=>!size||r.size===size).forEach(r=>{const k=r.method+'|'+r.seed;if(!by[k]||r.mtime>by[k].mtime)by[k]=r});
 const g=$('grid');g.textContent='';g.append(mk('span','m',size?'size '+size:'method'));d.seeds.forEach(s=>g.append(mk('span','m2','s'+s)));
@@ -493,7 +560,7 @@ $('sub').textContent=[cur.tag,cur.method+' · seed '+cur.seed+' · '+cur.size+' 
 $('bar').style.width=(cur.total?100*cur.step/cur.total:0)+'%';
 $('k_loss').textContent=cur.loss==null?'-':cur.loss.toFixed(3);$('k_step').textContent=cur.step+(cur.total?' / '+cur.total:'');$('k_tok').textContent=cur.tok_per_s==null?'-':Math.round(cur.tok_per_s)}
 else{$('sub').textContent='no run yet · engineering runs only, not clinical';$('bar').style.width='0'}
-renderPlan(d.plan);renderHw(d);renderGrid(d);renderLoss(d)}catch(e){$('sub').textContent='cannot reach the page server'}}
+renderPlan(d.plan);renderHw(d);renderQueue(d);renderGrid(d);renderLoss(d)}catch(e){$('sub').textContent='cannot reach the page server'}}
 nets();setInterval(nets,1000);tick();setInterval(tick,2000);requestAnimationFrame(frame);
 </script>"""
 
@@ -501,11 +568,13 @@ nets();setInterval(nets,1000);tick();setInterval(tick,2000);requestAnimationFram
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--runs", default="runs")
+    ap.add_argument("--log", default=None)
     ap.add_argument("--plan", default=str(Path(__file__).with_name("plan-status.json")))
     ap.add_argument("--port", type=int, default=8790)
     ap.add_argument("--host", default="127.0.0.1")
     a = ap.parse_args()
     runs_dir, plan = Path(a.runs), Path(a.plan)
+    log = Path(a.log) if a.log else runs_dir.parent / "supervisor.log"
 
     import threading
 
@@ -524,7 +593,7 @@ def main() -> int:
         def do_GET(self):
             path = self.path.split("?")[0]
             if path == "/api/state":
-                body, kind = json.dumps(build_state(runs_dir, plan)).encode(), "application/json"
+                body, kind = json.dumps(build_state(runs_dir, plan, log=log)).encode(), "application/json"
             elif path == "/layers":
                 st = build_state(runs_dir, plan)
                 folder = runs_dir / st["current"] if st["current"] else None
