@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   applyReferralAction,
+  chpStepLabel,
   createReferral,
   describeReferral,
+  OUTCOME_CODES,
+  outcomeLabel,
   REFERRAL_STAGES,
 } from "../lib/referral";
 import type { Referral } from "../lib/types";
@@ -161,5 +164,28 @@ describe("same event, different words", () => {
     expect(describeReferral("chp", referral, "go_now", "sw").action?.id).toBe(
       "travel",
     );
+  });
+});
+
+describe("CHP tracker words", () => {
+  it("names every stage in plain words in both languages, never the enum", () => {
+    for (const locale of ["en", "sw"] as const) {
+      const words = REFERRAL_STAGES.map((stage) => chpStepLabel(stage, locale));
+      expect(new Set(words).size).toBe(REFERRAL_STAGES.length);
+      for (const word of words) {
+        expect(word).not.toMatch(/_/);
+        expect(word.length).toBeGreaterThan(0);
+      }
+    }
+    expect(chpStepLabel("patient_moving", "en")).toBe("The family is on the way");
+    expect(chpStepLabel("patient_moving", "sw")).toBe("Familia iko njiani");
+  });
+
+  it("offers every outcome code with a label", () => {
+    expect(OUTCOME_CODES).toEqual(["treated", "referred_onward", "did_not_arrive", "unknown"]);
+    for (const code of OUTCOME_CODES) {
+      expect(outcomeLabel(code, "en").length).toBeGreaterThan(0);
+      expect(outcomeLabel(code, "sw")).not.toBe(outcomeLabel(code, "en"));
+    }
   });
 });

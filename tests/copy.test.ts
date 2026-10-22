@@ -26,6 +26,34 @@ describe("copy parity", () => {
   });
 });
 
+describe("CHP work surface copy", () => {
+  const chpKeys = (Object.keys(copyTables.en) as CopyKey[]).filter(
+    (key) =>
+      key.startsWith("chp") ||
+      key === "handoffMainProblem" ||
+      key === "handoffDangerSigns" ||
+      key === "handoffNoDangerSigns",
+  );
+
+  it("translates every new CHP string into Kiswahili, not copied English", () => {
+    expect(chpKeys.length).toBeGreaterThan(60);
+    for (const key of chpKeys) {
+      expect(copyTables.sw[key].trim(), key).not.toBe("");
+      expect(copyTables.sw[key], key).not.toBe(copyTables.en[key]);
+    }
+  });
+
+  it("holds the offline wording the field asked for", () => {
+    expect(t("chpQueuedNotice", "en")).toBe("Queued, will send when online");
+    expect(t("chpQueuedNotice", "sw")).toBe("Imepangwa, itatumwa mtandao ukirudi");
+  });
+
+  it("labels demo households as demo in both languages", () => {
+    expect(fill(t("chpHouseholdTpl", "en"), { n: 3 })).toBe("Demo household 3");
+    expect(fill(t("chpHouseholdTpl", "sw"), { n: 3 })).toBe("Kaya ya majaribio 3");
+  });
+});
+
 describe("the four decisions", () => {
   it("holds the locked wording in English", () => {
     expect(t("goNow", "en")).toBe("Go now");

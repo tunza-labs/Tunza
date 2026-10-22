@@ -10,6 +10,11 @@ import type { GatedRole } from "@/lib/types";
  * Codes are verified server-side (/api/access) and never shipped to the
  * client; while the server runs on demo codes, the screen says so. This is
  * the placeholder for real worker sign-up and identity.
+ *
+ * This is a DEMO gate, not authentication: a shared code unlocks a surface
+ * on this device, with no accounts, sessions, or per-worker identity. Do not
+ * treat a grant as proof of who someone is. Real CHP identity (for example a
+ * registry-issued login) is a separate product decision, not built here.
  */
 export function RoleGate() {
   const { state, dispatch } = useCare();
