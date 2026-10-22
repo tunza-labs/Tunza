@@ -14,11 +14,19 @@ type Status = "locating" | "ready" | "fallback";
  * precise position stays in this component (for accurate distances); the
  * server only ever sees the coarse precision-5 geohash cell center. Every
  * failure — no geolocation, permission denied, offline, lookup unconfigured,
- * nothing found — falls back to the demo list with an honest note.
+ * nothing found — falls back to the demo list with an honest note. Offline,
+ * it skips the lookup entirely, and while locating it already shows the demo
+ * list, so there is always something to act on without waiting.
  */
-export function NearbyFacilities({ locale }: { locale: Locale }) {
+export function NearbyFacilities({
+  locale,
+  offline = false,
+}: {
+  locale: Locale;
+  offline?: boolean;
+}) {
   const [status, setStatus] = useState<Status>(() =>
-    typeof navigator !== "undefined" && "geolocation" in navigator
+    !offline && typeof navigator !== "undefined" && "geolocation" in navigator
       ? "locating"
       : "fallback",
   );
@@ -27,7 +35,7 @@ export function NearbyFacilities({ locale }: { locale: Locale }) {
   useEffect(() => {
     let active = true;
 
-    if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
+    if (offline || typeof navigator === "undefined" || !("geolocation" in navigator)) {
       return;
     }
 
@@ -68,16 +76,16 @@ export function NearbyFacilities({ locale }: { locale: Locale }) {
       active = false;
       window.clearTimeout(watchdog);
     };
-  }, [locale]);
+  }, [locale, offline]);
 
-  if (status === "locating") {
-    return <p className="text-body text-ink-soft">{t("nearbyLocating", locale)}</p>;
-  }
-
-  if (status === "fallback") {
+  if (status === "locating" || status === "fallback") {
     return (
       <>
-        <p className="text-label text-ink-soft">{t("nearbyDemoFallback", locale)}</p>
+        <p className="text-label text-ink-soft" role="status">
+          {status === "locating"
+            ? t("nearbyLocating", locale)
+            : t("nearbyDemoFallback", locale)}
+        </p>
         {DEMO_FACILITIES.map((facility) => (
           <FacilityCard
             key={facility.id}

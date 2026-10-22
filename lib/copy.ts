@@ -366,6 +366,26 @@ const en = {
   contractRedFlags: "Recorded flags",
   contractNextAction: "Next action",
   contractProvenance: "Provenance",
+
+  // Household surface — honest limits, the danger strip, the result screen
+  noticeTitle: "This is a demonstration",
+  noticeBody:
+    "Tunza suggests a next step from a few answers. It does not diagnose, and it is not a doctor. Facility names with “Demo” are examples, not real places. If you are worried, do not wait for this app. Go to care.",
+  noticeDismiss: "I understand",
+  helpLink: "About this demo",
+  demoNotDiagnosisShort: "This is a demonstration, not a diagnosis.",
+  dangerStripLabel: "Danger signs",
+  whatToDoNow: "What to do now",
+  waitGoNow: "Leave now. Take this phone with you. Stay with them on the way.",
+  waitToday:
+    "Plan to leave today. Take this phone with you. If a danger sign starts, go now.",
+  waitMonitor: "Stay with them and keep watching. If a danger sign starts, go now.",
+  waitOneMore:
+    "Answer one more question. If a danger sign starts before then, go now.",
+  nearestFacility: "Nearest facility",
+  shareChp: "Share with your community health promoter",
+  shareHeaderTpl: "Tunza demo: {d}",
+  shareFacilityTpl: "Nearest facility: {f}",
 };
 
 export type CopyKey = keyof typeof en;
@@ -708,6 +728,23 @@ const sw: Record<CopyKey, string> = {
   contractRedFlags: "Alama zilizorekodiwa",
   contractNextAction: "Hatua inayofuata",
   contractProvenance: "Chanzo",
+
+  noticeTitle: "Huu ni mfano wa majaribio",
+  noticeBody:
+    "Tunza inapendekeza hatua inayofuata kutokana na majibu machache. Haitambui ugonjwa, na si daktari. Majina ya vituo yenye “Demo” ni mifano, si mahali halisi. Ukiwa na wasiwasi, usisubiri programu hii. Nenda kupata huduma.",
+  noticeDismiss: "Nimeelewa",
+  helpLink: "Kuhusu jaribio hili",
+  demoNotDiagnosisShort: "Huu ni mfano wa majaribio, si utambuzi wa ugonjwa.",
+  dangerStripLabel: "Dalili za hatari",
+  whatToDoNow: "Cha kufanya sasa",
+  waitGoNow: "Ondoka sasa. Beba simu hii. Kaa naye njiani.",
+  waitToday: "Panga kuondoka leo. Beba simu hii. Dalili ya hatari ikianza, nenda sasa.",
+  waitMonitor: "Kaa naye na uendelee kuangalia. Dalili ya hatari ikianza, nenda sasa.",
+  waitOneMore: "Jibu swali moja zaidi. Dalili ya hatari ikianza kabla ya hapo, nenda sasa.",
+  nearestFacility: "Kituo cha karibu",
+  shareChp: "Shiriki na mhamasishaji wa afya ya jamii",
+  shareHeaderTpl: "Tunza (jaribio): {d}",
+  shareFacilityTpl: "Kituo cha karibu: {f}",
 };
 
 const TABLES: Record<Locale, Record<CopyKey, string>> = { en, sw };

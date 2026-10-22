@@ -7,6 +7,8 @@ type Props = {
   eyebrow: string;
   title: string;
   body?: string;
+  /** Interrupt assistive tech (role="alert") — reserved for danger signs. */
+  assertive?: boolean;
 };
 
 const TONE: Record<NamedWarning, string> = {
@@ -20,11 +22,11 @@ const TONE: Record<NamedWarning, string> = {
   watch_sign: "bg-watch-soft text-watch",
 };
 
-export function Warning({ named, eyebrow, title, body }: Props) {
+export function Warning({ named, eyebrow, title, body, assertive = false }: Props) {
   return (
     <aside
       className={`rounded-2xl px-4 py-3 ${TONE[named]}`}
-      role="status"
+      role={assertive ? "alert" : "status"}
       data-named-state={named}
     >
       <p className="text-caption font-medium uppercase tracking-[0.12em]">{eyebrow}</p>

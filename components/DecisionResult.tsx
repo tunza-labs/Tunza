@@ -1,8 +1,10 @@
 /** V1 care-path component. Reused across household, CHP, and facility. */
 
+"use client";
+
+import { useEffect, useRef, type ReactNode } from "react";
 import { t, type Locale } from "@/lib/copy";
 import type { DecisionKind } from "@/lib/types";
-import type { ReactNode } from "react";
 
 type Props = {
   locale: Locale;
@@ -11,6 +13,10 @@ type Props = {
   status: string;
   action?: { label: string; onClick: () => void };
   why?: string[];
+  /** Support shown between the verdict and the action (household: why, what to do, where). */
+  lead?: ReactNode;
+  /** Move focus to the verdict when it appears, so it is announced first. */
+  autoFocus?: boolean;
   children?: ReactNode;
 };
 
@@ -28,8 +34,18 @@ export function DecisionResult({
   status,
   action,
   why,
+  lead,
+  autoFocus = false,
   children,
 }: Props) {
+  const headingRef = useRef<HTMLHeadingElement>(null);
+
+  useEffect(() => {
+    if (autoFocus) {
+      headingRef.current?.focus();
+    }
+  }, [autoFocus, kind]);
+
   return (
     <section className="flex flex-col gap-6">
       <header className="flex flex-col gap-3">
@@ -37,18 +53,22 @@ export function DecisionResult({
           {t("nextAction", locale)}
         </p>
         <h1
-          className={`text-decision font-bold tracking-tight ${HEADLINE_COLOR[kind]}`}
+          ref={headingRef}
+          tabIndex={-1}
+          className={`text-decision font-bold tracking-tight outline-none ${HEADLINE_COLOR[kind]}`}
         >
           {headline}
         </h1>
         <p className="text-body font-semibold text-ink">{status}</p>
       </header>
 
+      {lead}
+
       {action ? (
         <button
           type="button"
           onClick={action.onClick}
-          className="min-h-14 rounded-2xl bg-action px-4 text-body font-semibold text-action-ink"
+          className="min-h-14 rounded-2xl bg-action px-4 text-body font-semibold text-action-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
         >
           {action.label}
         </button>

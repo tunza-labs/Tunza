@@ -5,6 +5,7 @@
  * content. Everything after this screen wears paper.
  */
 
+import { Icon } from "@/components/Icon";
 import { t, type Locale } from "@/lib/copy";
 
 type Props = {
@@ -38,19 +39,21 @@ export function HomeScreen({
       <button
         type="button"
         onClick={onStart}
-        className="mt-8 min-h-14 rounded-2xl bg-raised px-4 text-body font-semibold text-action"
+        className="mt-8 min-h-14 rounded-2xl bg-raised px-4 text-body font-semibold text-action focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
       >
         {t("homeGetStarted", locale)}
       </button>
 
       <div className="mt-4 grid grid-cols-2 gap-3">
         <button type="button" onClick={onStart} className={card}>
+          <Icon name="thermometer" className="mb-2 size-6 text-white/85" />
           <p className="text-label font-semibold">{t("homeCardAssessTitle", locale)}</p>
           <p className="mt-1 text-caption text-white/70">
             {t("homeCardAssessDesc", locale)}
           </p>
         </button>
         <button type="button" onClick={onNearby} className={card}>
+          <Icon name="pin" className="mb-2 size-6 text-white/85" />
           <p className="text-label font-semibold">{t("homeCardNearbyTitle", locale)}</p>
           <p className="mt-1 text-caption text-white/70">
             {t("homeCardNearbyDesc", locale)}
@@ -58,6 +61,7 @@ export function HomeScreen({
         </button>
         {continueDetail ? (
           <button type="button" onClick={onContinue} className={`${card} col-span-2`}>
+            <Icon name="arrow" className="mb-2 size-6 text-white/85" />
             <p className="text-label font-semibold">
               {t("homeCardContinueTitle", locale)}
             </p>
@@ -72,7 +76,7 @@ export function HomeScreen({
       <button
         type="button"
         onClick={onHealthWorker}
-        className="mt-3 self-start text-label font-medium text-white underline underline-offset-2"
+        className="mt-3 min-h-12 self-start text-label font-medium text-white underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
       >
         {t("homeHealthWorker", locale)}
       </button>

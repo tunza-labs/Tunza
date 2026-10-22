@@ -42,6 +42,40 @@ describe("the four decisions", () => {
   });
 });
 
+describe("household surface copy", () => {
+  const HOUSEHOLD_KEYS: CopyKey[] = [
+    "noticeTitle",
+    "noticeBody",
+    "noticeDismiss",
+    "helpLink",
+    "demoNotDiagnosisShort",
+    "dangerStripLabel",
+    "whatToDoNow",
+    "waitGoNow",
+    "waitToday",
+    "waitMonitor",
+    "waitOneMore",
+    "nearestFacility",
+    "shareChp",
+    "shareHeaderTpl",
+    "shareFacilityTpl",
+  ];
+
+  it("translates every household key into Kiswahili, never copying the English", () => {
+    for (const key of HOUSEHOLD_KEYS) {
+      expect(copyTables.en[key], `en.${key}`).toBeTruthy();
+      expect(copyTables.sw[key], `sw.${key}`).toBeTruthy();
+      expect(copyTables.sw[key], key).not.toBe(copyTables.en[key]);
+    }
+  });
+
+  it("says plainly that this is a demonstration, not a diagnosis", () => {
+    expect(t("noticeBody", "en")).toMatch(/does not diagnose/);
+    expect(t("noticeBody", "en")).toMatch(/not a doctor/);
+    expect(t("noticeBody", "sw")).toMatch(/Haitambui ugonjwa/);
+  });
+});
+
 describe("fill", () => {
   it("replaces named placeholders and leaves unknown ones visible", () => {
     expect(fill("Go to {f}.", { f: "North Demo Health Centre" })).toBe(
