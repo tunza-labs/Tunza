@@ -134,6 +134,28 @@ describe("negated danger words", () => {
     expect(sign("no seizure earlier but a seizure again now")).toBe("go_now");
   });
 
+  it("keeps real danger the red team found hiding behind negators", () => {
+    for (const phrase of [
+      "she has not stopped fitting",
+      "not stopping the seizure",
+      "did not stop fitting",
+      "bila shaka ana kifafa",
+      "hakuna shaka kifafa",
+      "hana homa na degedege",
+      "no fever and seizure",
+      "no seizure except this morning",
+      "not without a seizure",
+      "he is not not unconscious",
+      "cannot say he is not fitting",
+      "hana fahamu na haamki",
+      "no pulse not breathing",
+      "she is not unconscious until now",
+      "it is not true that he has no seizure",
+    ]) {
+      expect(sign(phrase), phrase).toBe("go_now");
+    }
+  });
+
   it("still escalates heavy bleeding with an injury", () => {
     expect(sign("a deep cut and the bleeding won't stop", { mainProblem: "injury" })).toBe("go_now");
   });

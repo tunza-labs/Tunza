@@ -62,33 +62,65 @@ const NEGATORS = new Set([
   "hakuna",
   "hana",
   "haina",
-  "hakuwa",
   "hajawahi",
-  "bila",
-  "si",
 ]);
-const CONTRASTS = new Set(["but", "lakini", "ila", "however", "though"]);
+// Words that may sit between a negator and the danger word ("no history of seizure").
+const FILLERS = new Set(["a", "an", "any", "the", "of", "sign", "signs", "history", "dalili", "za"]);
+// Doubt before a negator means the speaker does not know, so nothing is ruled out.
+const DOUBT = new Set(["cannot", "can't", "unsure", "sure", "idea", "know", "sijui", "shaka"]);
+// A word right after the match that brings the danger back ("no seizure except today").
+const CONTRASTS = new Set([
+  "but",
+  "lakini",
+  "ila",
+  "isipokuwa",
+  "except",
+  "yet",
+  "bado",
+  "though",
+  "however",
+  "ingawa",
+  "bali",
+  "until",
+]);
 
 /**
  * True when the pattern matches somewhere that is not negated. A match counts
- * as negated only when a negator sits within the three words before it, in
- * the same clause, with no "but" between them. Any unnegated match wins, so
- * a stray "no" can never hide a real danger word. Engineering shakedown rule;
- * a clinician has not reviewed it.
+ * as negated only when a negator sits immediately before it (at most two
+ * filler words between), in the same clause, with no doubt word or second negator shortly before
+ * the negator and no "but" or "except" right after the match. Anything else keeps
+ * the old behaviour: the word flags. Any unnegated match wins, so a stray
+ * "no" can never hide a real danger word. Engineering shakedown rule; a
+ * clinician has not reviewed it. Red-teamed on 2026-10-22 and narrowed.
  */
 export function hasUnnegatedMatch(re: RegExp, lower: string): boolean {
   const global = new RegExp(re.source, "g");
   for (const m of lower.matchAll(global)) {
-    const before = lower.slice(0, m.index ?? 0);
-    const clause = before.split(/[.,;:!?\n]/).pop() ?? "";
-    const words = clause.trim().split(/\s+/).filter(Boolean).slice(-3);
-    let negatedAt = -1;
-    words.forEach((word, index) => {
-      if (NEGATORS.has(word)) negatedAt = index;
-    });
-    const contrasted =
-      negatedAt >= 0 && words.slice(negatedAt + 1).some((w) => CONTRASTS.has(w));
-    if (negatedAt < 0 || contrasted) return true;
+    const start = m.index ?? 0;
+    const clause = lower.slice(0, start).split(/[.,;:!?\n]/).pop() ?? "";
+    const words = clause.trim().split(/\s+/).filter(Boolean);
+    let i = words.length - 1;
+    let fillers = 0;
+    while (i >= 0 && FILLERS.has(words[i]) && fillers < 2) {
+      i -= 1;
+      fillers += 1;
+    }
+    // Doubt or another negator shortly before means doubt or a double negative
+    // ("not without a seizure"): do not suppress.
+    const negated =
+      i >= 0 &&
+      NEGATORS.has(words[i]) &&
+      !words
+        .slice(Math.max(0, i - 6), i)
+        .some((w) => DOUBT.has(w) || NEGATORS.has(w));
+    const after = lower
+      .slice(start + m[0].length)
+      .split(/[.,;:!?\n]/)[0]
+      .trim()
+      .split(/\s+/)
+      .slice(0, 3);
+    const contrasted = after.some((w) => CONTRASTS.has(w));
+    if (!negated || contrasted) return true;
   }
   return false;
 }
@@ -143,7 +175,7 @@ export function decide(answers: AssessmentAnswers): Decision {
     dangerSignKeys.push("dangerChildNoDrink");
   }
   if (answers.mainProblem === "injury" && hasInjury(answers.presentation)) {
-    if (hasUnnegatedMatch(/heavy|won'?t stop|a lot|nyingi/, answers.presentation.toLowerCase())) {
+    if (hasUnnegatedMatch(/(?:bleeding\s+)?(?:heavy|heavily|won'?t stop|a lot|nyingi)/, answers.presentation.toLowerCase())) {
       dangerSignKeys.push("dangerHeavyBleeding");
     }
   }
