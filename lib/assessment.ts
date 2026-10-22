@@ -54,9 +54,48 @@ const WATCH_SIGN_KEYS: CopyKey[] = [
   "watchSeizureBleeding",
 ];
 
+const NEGATORS = new Set([
+  "no",
+  "not",
+  "never",
+  "without",
+  "hakuna",
+  "hana",
+  "haina",
+  "hakuwa",
+  "hajawahi",
+  "bila",
+  "si",
+]);
+const CONTRASTS = new Set(["but", "lakini", "ila", "however", "though"]);
+
+/**
+ * True when the pattern matches somewhere that is not negated. A match counts
+ * as negated only when a negator sits within the three words before it, in
+ * the same clause, with no "but" between them. Any unnegated match wins, so
+ * a stray "no" can never hide a real danger word. Engineering shakedown rule;
+ * a clinician has not reviewed it.
+ */
+export function hasUnnegatedMatch(re: RegExp, lower: string): boolean {
+  const global = new RegExp(re.source, "g");
+  for (const m of lower.matchAll(global)) {
+    const before = lower.slice(0, m.index ?? 0);
+    const clause = before.split(/[.,;:!?\n]/).pop() ?? "";
+    const words = clause.trim().split(/\s+/).filter(Boolean).slice(-3);
+    let negatedAt = -1;
+    words.forEach((word, index) => {
+      if (NEGATORS.has(word)) negatedAt = index;
+    });
+    const contrasted =
+      negatedAt >= 0 && words.slice(negatedAt + 1).some((w) => CONTRASTS.has(w));
+    if (negatedAt < 0 || contrasted) return true;
+  }
+  return false;
+}
+
 export function presentationDangerSigns(text: string): CopyKey[] {
   const lower = text.toLowerCase();
-  return DANGER_PATTERNS.filter((item) => item.re.test(lower)).map(
+  return DANGER_PATTERNS.filter((item) => hasUnnegatedMatch(item.re, lower)).map(
     (item) => item.key,
   );
 }
@@ -104,7 +143,7 @@ export function decide(answers: AssessmentAnswers): Decision {
     dangerSignKeys.push("dangerChildNoDrink");
   }
   if (answers.mainProblem === "injury" && hasInjury(answers.presentation)) {
-    if (/heavy|won'?t stop|a lot|nyingi/.test(answers.presentation.toLowerCase())) {
+    if (hasUnnegatedMatch(/heavy|won'?t stop|a lot|nyingi/, answers.presentation.toLowerCase())) {
       dangerSignKeys.push("dangerHeavyBleeding");
     }
   }

@@ -113,3 +113,32 @@ describe("applyAnswer", () => {
     expect(nextQuestion(afterWho, "who")).toBe("what");
   });
 });
+
+describe("negated danger words", () => {
+  const sign = (presentation: string, extra: Partial<AssessmentAnswers> = {}) =>
+    decide(fillAnswers({ who: "child", presentation, ...extra })).kind;
+
+  it("does not escalate when the danger word is plainly negated", () => {
+    expect(sign("the baby has no seizure, only a fever")).not.toBe("go_now");
+    expect(sign("hakuna kifafa, ana homa tu")).not.toBe("go_now");
+    expect(sign("he is not unconscious, just tired")).not.toBe("go_now");
+    expect(sign("it is not bleeding a lot, only a few drops", { mainProblem: "injury" })).not.toBe("go_now");
+  });
+
+  it("still escalates real danger, including after a negation", () => {
+    expect(sign("the baby is having a seizure")).toBe("go_now");
+    expect(sign("ana kifafa sasa")).toBe("go_now");
+    expect(sign("he is unconscious and not waking")).toBe("go_now");
+    expect(sign("no fever but he is fitting now")).toBe("go_now");
+    expect(sign("no, he is fitting")).toBe("go_now");
+    expect(sign("no seizure earlier but a seizure again now")).toBe("go_now");
+  });
+
+  it("still escalates heavy bleeding with an injury", () => {
+    expect(sign("a deep cut and the bleeding won't stop", { mainProblem: "injury" })).toBe("go_now");
+  });
+
+  it("is deliberately limited: look-alike words still escalate", () => {
+    expect(sign("blue face paint from the party")).toBe("go_now");
+  });
+});
