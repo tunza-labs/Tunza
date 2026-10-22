@@ -16,11 +16,13 @@ import {
   nextQuestion,
 } from "./assessment";
 import { applyReferralAction, createReferral } from "./referral";
+import { DESK_DEFAULT_FACILITY_ID, seedDemoCases } from "./desk";
 import { DEFAULT_LOCALE, type Locale } from "./copy";
 import { createId, nowIso } from "./ids";
 import type {
   CareState,
   Encounter,
+  FacilityCapacity,
   GatedRole,
   HouseholdView,
   NamedFailure,
@@ -56,6 +58,14 @@ type Action =
   | { type: "setPhoto"; attached: boolean }
   | { type: "prepareReferral" }
   | { type: "referralAction"; action: ReferralActionName; outcome?: OutcomeCode }
+  | {
+      type: "deskAction";
+      referralId: string;
+      action: ReferralActionName;
+      outcome?: OutcomeCode;
+    }
+  | { type: "setCapacity"; facilityId: string; capacity: FacilityCapacity }
+  | { type: "setDeskFacility"; facilityId: string }
   | { type: "goBack" }
   | { type: "continueForOneMore" }
   | { type: "reset" };
@@ -70,6 +80,7 @@ type ReferralActionName =
   | "complete"
   | "return_outcome"
   | "redirect"
+  | "decline"
   | "ask_more";
 
 function newEncounter(by: Role): Encounter {
@@ -96,6 +107,9 @@ export const initialCareState: CareState = {
   encounter: newEncounter("household"),
   referral: null,
   online: true,
+  facilityCapacity: {},
+  deskFacilityId: DESK_DEFAULT_FACILITY_ID,
+  demoCases: seedDemoCases(nowIso()),
 };
 
 function isOffline(state: CareState): boolean {
@@ -235,9 +249,48 @@ function reducer(state: CareState, action: Action): CareState {
         noFacilityResponse: state.injectedFailures.includes("no_facility_response"),
         weakConnection: state.injectedFailures.includes("weak_connection"),
         outcome: action.outcome,
+        capacity: state.facilityCapacity,
       });
       return { ...state, referral };
     }
+    case "deskAction": {
+      // The session referral takes the same path as referralAction. Synthetic
+      // demo cases move on their own copy and never touch the session one.
+      if (state.referral?.id === action.referralId) {
+        return reducer(state, {
+          type: "referralAction",
+          action: action.action,
+          outcome: action.outcome,
+        });
+      }
+      const index = state.demoCases.findIndex(
+        (item) => item.referral.id === action.referralId,
+      );
+      if (index === -1) {
+        return state;
+      }
+      const target = state.demoCases[index];
+      const referral = applyReferralAction(target.referral, action.action, state.role, {
+        offline: false,
+        noFacilityResponse: false,
+        weakConnection: false,
+        outcome: action.outcome,
+        capacity: state.facilityCapacity,
+      });
+      if (referral === target.referral) {
+        return state;
+      }
+      const demoCases = [...state.demoCases];
+      demoCases[index] = { ...target, referral };
+      return { ...state, demoCases };
+    }
+    case "setCapacity":
+      return {
+        ...state,
+        facilityCapacity: { ...state.facilityCapacity, [action.facilityId]: action.capacity },
+      };
+    case "setDeskFacility":
+      return { ...state, deskFacilityId: action.facilityId };
     case "continueForOneMore": {
       if (!state.encounter?.decision || state.referral) {
         return state;
@@ -298,6 +351,7 @@ function reducer(state: CareState, action: Action): CareState {
         locale: state.locale,
         online: state.online,
         encounter: newEncounter("household"),
+        demoCases: seedDemoCases(nowIso()),
       };
     default:
       return state;
@@ -329,6 +383,13 @@ type CareContextValue = {
     startCare: () => void;
     completeVisit: () => void;
     returnOutcome: (outcome: OutcomeCode) => void;
+    deskAction: (
+      referralId: string,
+      action: ReferralActionName,
+      outcome?: OutcomeCode,
+    ) => void;
+    setCapacity: (facilityId: string, capacity: FacilityCapacity) => void;
+    setDeskFacility: (facilityId: string) => void;
     goBack: () => void;
     continueForOneMore: () => void;
     reset: () => void;
@@ -362,6 +423,11 @@ function readStoredState(): CareState {
           locale: parsed.locale ?? DEFAULT_LOCALE,
           view: roleAllowed ? (parsed.view ?? "home") : "home",
           online: navigator.onLine,
+          facilityCapacity: parsed.facilityCapacity ?? {},
+          deskFacilityId: parsed.deskFacilityId ?? DESK_DEFAULT_FACILITY_ID,
+          demoCases: Array.isArray(parsed.demoCases)
+            ? parsed.demoCases
+            : seedDemoCases(nowIso()),
         };
       }
     }
@@ -397,6 +463,11 @@ function makeDispatch(
     completeVisit: () => dispatch({ type: "referralAction", action: "complete" }),
     returnOutcome: (outcome) =>
       dispatch({ type: "referralAction", action: "return_outcome", outcome }),
+    deskAction: (referralId, action, outcome) =>
+      dispatch({ type: "deskAction", referralId, action, outcome }),
+    setCapacity: (facilityId, capacity) =>
+      dispatch({ type: "setCapacity", facilityId, capacity }),
+    setDeskFacility: (facilityId) => dispatch({ type: "setDeskFacility", facilityId }),
     goBack: () => dispatch({ type: "goBack" }),
     continueForOneMore: () => dispatch({ type: "continueForOneMore" }),
     reset: () => dispatch({ type: "reset" }),
@@ -505,4 +576,4 @@ export function activeFailures(
 }
 
 export { reducer as careReducer };
-export type { Action as CareAction };
+export type { Action as CareAction, ReferralActionName };

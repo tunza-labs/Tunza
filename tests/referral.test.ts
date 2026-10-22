@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { redirectTarget } from "../lib/facilities";
 import {
   applyReferralAction,
+  canPerform,
   createReferral,
   describeReferral,
   REFERRAL_STAGES,
@@ -102,6 +104,70 @@ describe("referral object", () => {
     });
     expect(sent.stage).toBe("sent");
     expect(sent.failure).toBe("no_facility_response");
+  });
+});
+
+describe("redirect, cannot take, and capacity", () => {
+  function sentUrgent(): Referral {
+    return applyReferralAction(
+      createReferral({ encounterId: "enc-demo", urgent: true, by: "chp" }),
+      "send",
+      "chp",
+      calm,
+    );
+  }
+
+  it("redirects to the other demo facility when no capacity is reported", () => {
+    const redirected = applyReferralAction(sentUrgent(), "redirect", "facility", calm);
+    expect(redirected.facilityId).toBe("west-demo");
+    expect(redirected.failure).toBe("redirected");
+    expect(redirected.history.at(-1)?.reason).toBeUndefined();
+  });
+
+  it("cannot take goes through the same redirect and records why", () => {
+    const declined = applyReferralAction(sentUrgent(), "decline", "facility", calm);
+    expect(declined.stage).toBe("sent");
+    expect(declined.facilityId).toBe("west-demo");
+    expect(declined.failure).toBe("redirected");
+    expect(declined.history.at(-1)).toMatchObject({
+      stage: "sent",
+      by: "facility",
+      note: "West Demo Sub-County Hospital",
+      reason: "cannot_take",
+    });
+  });
+
+  it("allows cannot take exactly where redirect is allowed", () => {
+    const sent = sentUrgent();
+    expect(canPerform(sent, "decline")).toBe(true);
+    const moving = applyReferralAction(
+      applyReferralAction(sent, "accept", "facility", calm),
+      "travel",
+      "chp",
+      calm,
+    );
+    expect(canPerform(moving, "redirect")).toBe(false);
+    expect(canPerform(moving, "decline")).toBe(false);
+  });
+
+  it("skips closed facilities and keeps the referral when none is open", () => {
+    const sent = sentUrgent();
+    const kept = applyReferralAction(sent, "redirect", "facility", {
+      ...calm,
+      capacity: { "west-demo": "closed" },
+    });
+    expect(kept).toBe(sent);
+    const busy = applyReferralAction(sent, "decline", "facility", {
+      ...calm,
+      capacity: { "west-demo": "busy" },
+    });
+    expect(busy.facilityId).toBe("west-demo");
+  });
+
+  it("prefers a facility accepting now over a busy one", () => {
+    expect(redirectTarget("x-elsewhere", { "north-demo": "busy" })?.id).toBe("west-demo");
+    expect(redirectTarget("x-elsewhere", {})?.id).toBe("north-demo");
+    expect(redirectTarget("north-demo", { "west-demo": "closed" })).toBeNull();
   });
 });
 

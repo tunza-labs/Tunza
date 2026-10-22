@@ -10,6 +10,12 @@ import type { GatedRole } from "@/lib/types";
  * Codes are verified server-side (/api/access) and never shipped to the
  * client; while the server runs on demo codes, the screen says so. This is
  * the placeholder for real worker sign-up and identity.
+ *
+ * This is a demo gate only. Real authentication (per-worker identity,
+ * sessions, revocation) and audit logging of who opened which referral are
+ * NOT built. The grant is a device-local flag; the facility desk behind it,
+ * including its engineering panel, must not hold real patient data until
+ * both exist.
  */
 export function RoleGate() {
   const { state, dispatch } = useCare();

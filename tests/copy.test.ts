@@ -42,6 +42,33 @@ describe("the four decisions", () => {
   });
 });
 
+describe("facility desk copy", () => {
+  const deskKeys = (Object.keys(copyTables.en) as CopyKey[]).filter((key) =>
+    /^(desk|eng|capacity|asked|outcomeForm|outcomeReturned|age|sex)/.test(key),
+  );
+
+  it("covers every new desk, engineering, capacity and outcome-form key in both languages", () => {
+    expect(deskKeys.length).toBeGreaterThanOrEqual(60);
+    for (const key of deskKeys) {
+      expect(copyTables.sw[key], key).not.toBe(copyTables.en[key]);
+    }
+  });
+
+  it("marks the shadow candidate as not applied and not validated", () => {
+    expect(t("engPanelLabel", "en")).toBe(
+      "Shadow candidate, not applied, not clinically validated",
+    );
+    expect(t("engPanelLabel", "sw")).toContain("halijatumika");
+    expect(t("engPanelLabel", "sw")).toContain("halijathibitishwa");
+  });
+
+  it("labels the desk as demo with no real patients", () => {
+    expect(t("deskDemoNotice", "en")).toContain("No real patients");
+    expect(t("deskDemoNotice", "sw")).toContain("Hakuna wagonjwa halisi");
+    expect(t("deskSourceSynthetic", "en")).toContain("demo");
+  });
+});
+
 describe("fill", () => {
   it("replaces named placeholders and leaves unknown ones visible", () => {
     expect(fill("Go to {f}.", { f: "North Demo Health Centre" })).toBe(
