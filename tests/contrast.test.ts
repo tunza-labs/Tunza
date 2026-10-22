@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { CHIP_CLASS, CHIP_TOKENS } from "../components/StatusChip";
 
 /**
  * The color contract, enforced mechanically against the real tokens in
@@ -71,6 +72,16 @@ describe("color tokens", () => {
   it.each(FILL_PAIRS)("%s fill against %s meets non-text contrast", (fg, bg) => {
     expect(ratio(colors[fg], colors[bg])).toBeGreaterThanOrEqual(3);
   });
+
+  it.each(Object.entries(CHIP_TOKENS))(
+    "CHP %s chip text meets WCAG AA on its fill and on the row",
+    (status, [fg, bg]) => {
+      expect(colors[fg], `${status} text`).toBeDefined();
+      expect(colors[bg], `${status} fill`).toBeDefined();
+      expect(ratio(colors[fg], colors[bg])).toBeGreaterThanOrEqual(4.5);
+      expect(CHIP_CLASS[status as keyof typeof CHIP_CLASS]).toBe(`text-${fg} bg-${bg}`);
+    },
+  );
 
   it("keeps the emergency red distinctly brighter than the brand red", () => {
     expect(luminance(colors.urgent)).toBeGreaterThanOrEqual(

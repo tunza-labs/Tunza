@@ -1,5 +1,5 @@
 import { fill, t, type CopyKey, type Locale } from "./copy";
-import type { AssessmentAnswers, DecisionKind } from "./types";
+import type { AssessmentAnswers, Decision, DecisionKind } from "./types";
 
 export type HandoffFact = {
   label: string;
@@ -32,6 +32,14 @@ const DURATION_KEY: Record<string, CopyKey> = {
   longer: "durationLonger",
 };
 
+const MAIN_KEY: Record<string, CopyKey> = {
+  breathing: "mainBreathing",
+  fever: "mainFever",
+  injury: "mainInjury",
+  stomach: "mainStomach",
+  other: "mainOther",
+};
+
 function answerLabel(
   value: string | null,
   table: Record<string, CopyKey>,
@@ -52,6 +60,22 @@ export function handoffFacts(
   const freshness = stale
     ? t("freshnessOld", locale)
     : fill(t("freshnessAssessedTpl", locale), { m: relativeMinutes(assessedAt) });
+  return [
+    ...answerFacts(answers, locale),
+    {
+      label: t("handoffTemp", locale),
+      value: "38.6 C",
+      freshness,
+      stale,
+    },
+  ];
+}
+
+/** The facts that come straight from the answers, with no demo vitals. */
+export function answerFacts(
+  answers: AssessmentAnswers,
+  locale: Locale,
+): HandoffFact[] {
   return [
     { label: t("handoffWho", locale), value: whoValue(answers, locale) },
     {
@@ -78,11 +102,28 @@ export function handoffFacts(
       label: t("handoffDuration", locale),
       value: answerLabel(answers.duration, DURATION_KEY, locale),
     },
+  ];
+}
+
+/**
+ * The CHP's structured handoff: only what the CHP entered and what decide()
+ * found. No demo temperature, because the CHP intake does not measure one.
+ */
+export function chpHandoffFacts(
+  answers: AssessmentAnswers,
+  decision: Decision,
+  locale: Locale,
+): HandoffFact[] {
+  const danger = decision.dangerSignKeys.map((key) => t(key, locale));
+  return [
+    ...answerFacts(answers, locale),
     {
-      label: t("handoffTemp", locale),
-      value: "38.6 C",
-      freshness,
-      stale,
+      label: t("handoffMainProblem", locale),
+      value: answerLabel(answers.mainProblem, MAIN_KEY, locale),
+    },
+    {
+      label: t("handoffDangerSigns", locale),
+      value: danger.length > 0 ? danger.join(", ") : t("handoffNoDangerSigns", locale),
     },
   ];
 }

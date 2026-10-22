@@ -13,6 +13,8 @@ type Props = {
   status: string;
   arrivalMinutes: number | null;
   action?: { label: string; onClick: () => void };
+  /** 1 when the status is the page; 2 when it sits under a page heading. */
+  headingLevel?: 1 | 2;
   children?: ReactNode;
 };
 
@@ -43,10 +45,12 @@ export function ReferralStatus({
   status,
   arrivalMinutes,
   action,
+  headingLevel = 1,
   children,
 }: Props) {
   const showArrivalInHeadline =
     role === "facility" && stage === "accepted" && arrivalMinutes !== null;
+  const Heading = headingLevel === 2 ? "h2" : "h1";
 
   return (
     <section className="flex flex-col gap-5" aria-live="polite">
@@ -54,7 +58,9 @@ export function ReferralStatus({
         <p className="text-caption font-medium uppercase tracking-[0.14em] text-ink-soft">
           {t("referralEyebrow", locale)} · {stageLabel}
         </p>
-        <h1 className="text-decision font-bold tracking-tight text-ink">
+        <Heading
+          className={`${headingLevel === 2 ? "text-heading" : "text-decision"} font-bold tracking-tight text-ink`}
+        >
           {headline}
           {showArrivalInHeadline ? (
             <>
@@ -65,7 +71,7 @@ export function ReferralStatus({
               />
             </>
           ) : null}
-        </h1>
+        </Heading>
         <p className="text-body font-semibold text-ink">{status}</p>
         {arrivalMinutes !== null && !showArrivalInHeadline ? (
           <p className="text-body font-semibold text-ink-soft">

@@ -235,6 +235,30 @@ export function stageLabel(stage: ReferralStage, locale: Locale): string {
   return t(STAGE_LABEL_KEY[stage], locale);
 }
 
+const CHP_STEP_KEY: Record<ReferralStage, CopyKey> = {
+  created: "chpStepCreated",
+  sent: "chpStepSent",
+  received: "chpStepReceived",
+  accepted: "chpStepAccepted",
+  patient_moving: "chpStepPatientMoving",
+  arrived: "chpStepArrived",
+  seen: "chpStepSeen",
+  completed: "chpStepCompleted",
+  outcome_returned: "chpStepOutcomeReturned",
+};
+
+/** What each stage means for the CHP, in plain words, for the tracker. */
+export function chpStepLabel(stage: ReferralStage, locale: Locale): string {
+  return t(CHP_STEP_KEY[stage], locale);
+}
+
+export const OUTCOME_CODES: OutcomeCode[] = [
+  "treated",
+  "referred_onward",
+  "did_not_arrive",
+  "unknown",
+];
+
 export function outcomeLabel(outcome: OutcomeCode, locale: Locale): string {
   switch (outcome) {
     case "treated":
