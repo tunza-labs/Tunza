@@ -2,14 +2,39 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AssessmentQuestion, type EntryMode } from "@/components/AssessmentQuestion";
+import type { IconName } from "@/components/Icon";
 import { Warning } from "@/components/Warning";
+import { presentationDangerSigns } from "@/lib/assessment";
 import { t } from "@/lib/copy";
 import { warningCopy } from "@/lib/failures";
 import { questionContent, dontKnowValue } from "@/lib/questions";
 import { startVoice, voiceAvailable, type VoiceHandle, type VoiceState } from "@/lib/voice";
 import { activeFailures, useCare } from "@/lib/store";
+import type { QuestionId } from "@/lib/types";
 
-export function AssessmentFlow() {
+/** Pictures beside the household answers. The words still carry the meaning. */
+const CHOICE_ICONS: Partial<Record<QuestionId, Record<string, IconName>>> = {
+  who: { self: "person", household_adult: "home", child: "child" },
+  awake: { alert: "eye", sleepy: "moon", not_waking: "eye-closed" },
+  breathing: { fine: "wind", difficult: "wind-fast", severe: "alert" },
+  drinking: { yes: "cup", little: "cup-half", no: "cup-empty" },
+  duration: { today: "sun", two_days: "calendar", longer: "clock" },
+  main_problem: {
+    breathing: "wind",
+    fever: "thermometer",
+    injury: "bandage",
+    stomach: "stomach",
+    other: "dots",
+  },
+};
+
+/**
+ * `household` turns on the household treatment: icons beside answers, focus
+ * that follows the question, and the danger switch — the moment a danger sign
+ * newly appears in what is typed or spoken, the answer is committed so the
+ * existing decide() rules move the screen straight to their go-now state.
+ */
+export function AssessmentFlow({ household = false }: { household?: boolean }) {
   const { state, dispatch } = useCare();
   const encounter = state.encounter;
   const question = encounter?.currentQuestion;
@@ -41,6 +66,17 @@ export function AssessmentFlow() {
   );
   const offline = failures.includes("offline");
 
+  function updatePresentation(next: string) {
+    dispatch.setPresentation(next);
+    if (!household || currentQuestion !== "what") {
+      return;
+    }
+    const before = new Set(presentationDangerSigns(currentEncounter.answers.presentation));
+    if (presentationDangerSigns(next).some((key) => !before.has(key))) {
+      dispatch.answer("what", next.trim());
+    }
+  }
+
   function onDontKnow() {
     dispatch.answer(currentQuestion, dontKnowValue(currentQuestion));
   }
@@ -64,7 +100,7 @@ export function AssessmentFlow() {
       online: !offline,
       onText: (text) => {
         const current = currentEncounter.answers.presentation;
-        dispatch.setPresentation(current ? `${current} ${text}` : text);
+        updatePresentation(current ? `${current} ${text}` : text);
       },
       onState: (next) => {
         if (next === "listening" || next === "transcribing") {
@@ -107,7 +143,7 @@ export function AssessmentFlow() {
         <button
           type="button"
           onClick={dispatch.goBack}
-          className="self-start text-label font-medium text-ink-soft"
+          className="min-h-12 self-start text-label font-medium text-ink-soft"
         >
           {t("back", locale)}
         </button>
@@ -117,7 +153,16 @@ export function AssessmentFlow() {
         locale={locale}
         question={content.question}
         hint={content.hint}
-        choices={content.choices}
+        choices={
+          household
+            ? content.choices.map((choice) => ({
+                ...choice,
+                icon: CHOICE_ICONS[currentQuestion]?.[choice.id],
+              }))
+            : content.choices
+        }
+        focusOnChange={household}
+        dontKnowIcon={household ? "question" : undefined}
         dontKnowLabel={
           currentQuestion === "who" ? t("whoUnknown", locale) : t("dontKnow", locale)
         }
@@ -141,7 +186,7 @@ export function AssessmentFlow() {
                 mode,
                 onMode: setMode,
                 text: currentEncounter.answers.presentation,
-                onText: dispatch.setPresentation,
+                onText: updatePresentation,
                 listening: voiceState !== "idle",
                 speakAvailable: voiceAvailable(),
                 speakLabel,

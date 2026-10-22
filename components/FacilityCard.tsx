@@ -11,6 +11,8 @@ type Props = {
   services?: string[];
   address?: string;
   statusLabel: string;
+  /** Overrides the default "Facility" eyebrow (household: "Nearest facility"). */
+  eyebrow?: string;
 };
 
 function TemplateNumber({
@@ -41,11 +43,12 @@ export function FacilityCard({
   services,
   address,
   statusLabel,
+  eyebrow,
 }: Props) {
   return (
     <article className="rounded-2xl border border-line bg-raised px-4 py-4">
       <p className="text-caption font-medium uppercase tracking-[0.12em] text-ink-soft">
-        {t("facilityEyebrow", locale)}
+        {eyebrow ?? t("facilityEyebrow", locale)}
       </p>
       <h2 className="mt-1 text-heading font-semibold text-ink">{name}</h2>
       {travelMinutes !== null ? (
