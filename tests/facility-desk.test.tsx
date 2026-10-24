@@ -33,7 +33,10 @@ function rowsFor(locale: Locale, capacity = {}) {
   );
 }
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllEnvs();
+});
 
 describe("DeskInbox", () => {
   it.each(LOCALES)("is a real table with caption, column and row headers (%s)", (locale) => {
@@ -134,7 +137,16 @@ describe("EngineeringPanel", () => {
     }
   });
 
+  it("renders nothing for anyone when the engineer view is off", () => {
+    vi.stubEnv("NEXT_PUBLIC_TUNZA_ENGINEER_VIEW", "");
+    const { container } = render(
+      <EngineeringPanel locale="en" role="facility" review={reviewCase(item, "en")} />,
+    );
+    expect(container.innerHTML).toBe("");
+  });
+
   it.each(LOCALES)("is collapsed by default and always labels the candidate (%s)", (locale) => {
+    vi.stubEnv("NEXT_PUBLIC_TUNZA_ENGINEER_VIEW", "1");
     const { container } = render(
       <EngineeringPanel locale={locale} role="facility" review={reviewCase(item, locale)} />,
     );
@@ -148,6 +160,7 @@ describe("EngineeringPanel", () => {
   });
 
   it("says when there is no shadow candidate", () => {
+    vi.stubEnv("NEXT_PUBLIC_TUNZA_ENGINEER_VIEW", "1");
     const none = deskCases(facilityState("en")).find((c) => c.id === "demo-ref-c")!;
     const { getByText } = render(
       <EngineeringPanel locale="en" role="facility" review={reviewCase(none, "en")} />,
@@ -257,6 +270,7 @@ describe("FacilitySurface", () => {
   });
 
   it("keeps the shadow candidate inside the engineering panel only", () => {
+    vi.stubEnv("NEXT_PUBLIC_TUNZA_ENGINEER_VIEW", "1");
     const view = mount("en");
     const rowB = within(view.container.querySelector('tr[data-row-id="demo-ref-b"]') as HTMLElement);
     fireEvent.click(rowB.getAllByRole("button")[0]);

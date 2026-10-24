@@ -6,6 +6,7 @@ import { CapacityControl } from "@/components/facility/CapacityControl";
 import { CaseView } from "@/components/facility/CaseView";
 import { DeskInbox } from "@/components/facility/DeskInbox";
 import { missingInfo } from "@/lib/assessment";
+import { useLiveCandidate } from "@/lib/clinical/useLiveCandidate";
 import { t } from "@/lib/copy";
 import {
   askedOfFacility,
@@ -59,6 +60,11 @@ export function FacilitySurface() {
   );
 
   const openIndex = openId ? cases.findIndex((item) => item.id === openId) : -1;
+  const openCase = openIndex === -1 ? null : cases[openIndex];
+  const liveCandidate = useLiveCandidate(
+    openCase ? openCase.id : null,
+    openCase ? openCase.encounter.answers : null,
+  );
 
   if (openIndex === -1) {
     if (rows.length === 0) {
@@ -99,7 +105,7 @@ export function FacilitySurface() {
   const item = cases[openIndex];
   const row = rows[openIndex];
   const { encounter, referral } = item;
-  const review = reviewCase(item, locale);
+  const review = reviewCase(item, locale, liveCandidate);
   const kind = review.rulesKind;
   // The stale marker follows the demo's named condition for the session case.
   // Synthetic cases carry their own assessment time.

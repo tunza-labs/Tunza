@@ -460,25 +460,30 @@ export type ShadowReview = {
  * decide(). If the pipeline refuses the input, the assessment is absent
  * rather than guessed.
  */
-export function reviewCase(item: DeskCase, locale: Locale): ShadowReview {
+export function reviewCase(
+  item: DeskCase,
+  locale: Locale,
+  liveCandidate: ShadowCandidate | null = null,
+): ShadowReview {
+  const candidate = liveCandidate ?? item.shadowCandidate;
   const rulesKind = decide(item.encounter.answers).kind;
   try {
     const result = runClinicalPipeline({
       encounter: item.encounter,
       generatedAt: item.referral.createdAt,
       locale,
-      candidate: item.shadowCandidate,
+      candidate,
     });
     return {
       rulesKind,
-      candidatePresent: item.shadowCandidate !== null,
+      candidatePresent: candidate !== null,
       record: result.disagreement,
       rendered: result.rendered,
     };
   } catch {
     return {
       rulesKind,
-      candidatePresent: item.shadowCandidate !== null,
+      candidatePresent: candidate !== null,
       record: null,
       rendered: null,
     };

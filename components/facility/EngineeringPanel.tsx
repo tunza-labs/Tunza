@@ -1,6 +1,7 @@
 import { decisionHeadline } from "@/lib/assessment";
 import { t, type Locale } from "@/lib/copy";
 import { disagreementReasonLabel, type ShadowReview } from "@/lib/desk";
+import { isEngineerView } from "@/lib/engineer";
 import type { Role } from "@/lib/types";
 
 type Props = {
@@ -10,12 +11,12 @@ type Props = {
 };
 
 /**
- * Engineering view of the reconcile disagreement record. Facility role only,
- * collapsed by default. It reads the record; it never feeds the displayed
+ * Engineering view of the reconcile disagreement record. Engineers only
+ * (build flag), facility role, collapsed by default. It reads the record; it never feeds the displayed
  * answer, which is always decide() on the case answers.
  */
 export function EngineeringPanel({ locale, role, review }: Props) {
-  if (role !== "facility") {
+  if (role !== "facility" || !isEngineerView()) {
     return null;
   }
   const record = review.record;
